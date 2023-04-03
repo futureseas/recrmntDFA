@@ -1,0 +1,311 @@
+---
+title: "Recruitment DFA data processing"
+author: "Robert Wildermuth"
+date: "2023-03-09"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+
+library(tidyverse)
+library(MARSS)
+library(lubridate)
+library(sf)
+library(stars)
+library(cubelyr)
+```
+
+# California Current Integrated Ecosystem Assessment data
+Data were downloaded from the [CalCurrent IEA website](https://www.integratedecosystemassessment.noaa.gov/regions/california-current/california-current-iea-indicators) 1/9/2023. Monthly or seasonal values were aggregated across relevant time periods for fish life histories to create annual values for the DFA.
+```{r}
+# get data files to read in and collate
+
+# data file path
+datPath <- "C:/Users/r.wildermuth/Documents/FutureSeas/RecruitmentIndex/DFA_data/"
+# handle weights, habitat, and zooplankton separately
+datFiles <- list.files(datPath)
+datFiles <- datFiles[-which(datFiles %in% c("Anchovy_Sardine_len_wt_age.csv", 
+                                              "AtlantisModel_C_biomass_data_31Mar2021.csv",
+                                              "SDMoutput"))]
+
+# df names
+datNames <- sub("_dl20230109.csv", "", datFiles)
+datNames <- sub("cciea_", "", datNames)
+
+# -------- Create table mapping variable names to descriptions and sources -----
+datDict <- data.frame(Variable = datNames,
+                      Description = c("Habitat compression index",
+                                      "Northern copepod biomass anomaly at 44.6N",
+                                      "Southern copepod biomass anomaly at 44.6N",
+                                      "Biologically Effective Upwelling Transport Index at 33N",
+                                      "Biologically Effective Upwelling Transport Index at 39N",
+                                      "Length of Upwelling Season Index at 33N",
+                                      "Length of Upwelling Season Index at 36N",
+                                      "Length of Upwelling Season Index at 39N",
+                                      "Multivariate El Nino Southern Oscillation Index",
+                                      "Northern Oscillation Index",
+                                      "North Pacific Gyre Oscillation Index",
+                                      "Pacific Decadal Oscillation Index",
+                                      "Spring Transition Index at 33N",
+                                      "Spring Transition Index at 36N",
+                                      "Spring Transition Index at 39N",
+                                      "Total Spring CalCOFI larval anchovy (ln(n+1)/10m^2)",
+                                      "Total Spring CalCOFI larval sardine (ln(n+1)/10m^2)",
+                                      "Total Spring CalCOFI larval southern mesopelagics (ln(n+1)/10m^2)",
+                                      "Mean myctophids in SWFSC Rockfish Recruitment & Ecosystem Assessment Survey (log(CPUE+1))"),
+                      Source = "CCIEA")
+datDict
+
+for(i in 1:length(datFiles)) {
+  assign(datNames[i],
+         read_csv(paste0(datPath,
+                          datFiles[i]),
+                  col_names = c("time", datNames[i]),
+                  col_types = c("T","d"),
+                  skip = 2))
+}
+
+# creates 'year' and 'month' columns 
+recrDat <- lapply(mget(datNames), 
+                  function(x) {x %>% mutate(year = year(time),
+                                            month = month(time)) %>%
+                                  select(-time)})
+
+# ---- Aggregate monthly measures for annual time series ------
+
+
+# collapses dfs into single wide table
+recrDat <- recrDat %>% reduce(full_join, by = c("year", "month"))
+
+recrDat %>% pivot_longer(cols = c(-year, -month), names_to = "Index", values_to = "vals") %>%
+  filter(!is.na(vals), year >= 1950, year != 2020) %>%
+  ggplot(aes(x = year, y = vals, color = as.character(month))) +
+  geom_line() +
+  facet_wrap(~Index, scales = "free_y") +
+  theme_classic()
+```
+
+# Weight-at-age data
+```{r}
+# From Yuhong Gu (3/21/2023): columns(cruise, ship, haul, species, and specimen) is a unique fish identifier, some fish has multiple readers.
+waa <- read_csv(file = paste0(datPath, "Anchovy_Sardine_len_wt_age.csv"), na = "NULL")
+
+waa <- waa %>% select(equilibriumTime, species, commonName, weightg, age) %>% 
+          mutate(equilibriumTime = ymd_hms(equilibriumTime),
+                 year = year(equilibriumTime), month = month(equilibriumTime),
+                 seas = case_when(month %in% 1:6 ~ "spring",
+                                  month %in% 7:12 ~ "summer")) %>%
+          group_by(year, seas, age, commonName) %>%
+          summarize(avgWAA = mean(weightg, na.rm = TRUE))
+
+waa %>% filter(age == 1) %>%
+  ggplot(aes(x = year, y = avgWAA, color = seas)) +
+  geom_line() +
+  facet_wrap(~commonName, scales = "free_y") +
+  labs(y = "Avg weight of Age 1 fish (g)")
+
+waa %>% group_by(commonName, year, seas) %>%
+  summarize(meanWt = mean(avgWAA, na.rm = TRUE)) %>%
+  ggplot(aes(x = year, y = meanWt, color = seas)) +
+  geom_line() +
+  facet_wrap(~commonName, scales = "free_y") +
+  labs(y = "Mean weight (g)")
+```
+# Zooplankton data
+```{r}
+zooplkn <- read_csv(file= paste0(datPath, "AtlantisModel_C_biomass_data_31Mar2021.csv"),
+                    na = "NaN")
+
+zooplkn <- zooplkn %>% mutate(Time = mdy_hm(Time),
+                              year = year(Time), month = month(Time),
+                              seas = case_when(month %in% 1:6 ~ "spring",
+                                               month %in% 7:12 ~ "summer")) %>%
+              filter(!is.na(year))
+
+# adding Atlantis groupings from Pierre-Yves definitions
+zooplkn <- zooplkn %>%
+              mutate(atlGrp = case_when(Class %in% c("salps","pyrosomes",
+                                                     "ctenophora", "cnidaria") ~ "Gelatinous",
+                             Class %in% c("polychaete","crustacea_others",
+                                          "chaetognatha","appendicularia",
+                                          "euphausiids") ~ "Large zooplankton",
+                             Class %in% c("pteropoda") ~ "Pteropods",
+                             Class %in% c("radiolarians","foraminifera") ~ "Microzooplankton",
+                             Class %in% c("all_calanoid_copepods","All_Copepods",
+                                          "doliolids","ostracods", "nauplii") ~ "Mesozooplankton",
+                             Class %in% c("eggs","others","bryozoan_larvae") ~ "Others",
+                             TRUE ~ "NA"))
+
+# Plot copepods, nauplii, eggs and euphausiids over time
+zooplkn %>% group_by(Class, year, seas) %>%
+  summarize(meanZooplkn = mean(`Carbon Biomass Sum (mgC m-2)`)) %>%
+  filter(Class %in% c("all_calanoid_copepods","All_Copepods", "nauplii",
+                      "eggs", "euphausiids")) %>%
+  ggplot(aes(x = year, y = meanZooplkn, color = seas)) +
+  geom_line() +
+  facet_wrap(~Class, scales = "free_y")
+```
+
+# Species distribution model outputs
+Spawning habitat area and duration are calculated from ROMS-based species distribution models produced by Barb Muhling and downloaded 3/29/2023. Habitat predictions are derived from SDMs without SSB included as a predictor. For now using only GAM estimates of SDM.
+
+From conversation with Barb on 3/29/23:
+- ROMS-based estimates have more predictors, thus better predictions of habitat
+- ROMS sample frame likely represents northern Pacific sardine stock better
+- ROMS predictions need updates before final version of analysis
+
+## Spawning habitat area
+A proxy of area of spawning habitat is determined by compiling daily habitat estimates across years within the traditional breeding season (for sardine: March - July). Breeding habitat is defined as SDM cells with probabilities of occurrence at or above the upper 95% confidence interval. The annual index is calculated as the sum of probabilities of occurrence in breeding habitat over all cells and days within the traditional breeding season for each year.
+
+```{r}
+# sardine and anchovy have different breeding seasons
+sardFiles <- expand.grid("sard", 3:7, 1998:2018, "GAM_noSSB.nc") %>% 
+                    mutate(sdmFile = paste(Var1, Var2, Var3, Var4, sep = "_")) %>%
+                    pull(sdmFile)
+
+sardFiles <- paste0(datPath, "SDMoutput/sardine_noSSB/", sardFiles)
+sardSDMs <- read_stars(sardFiles, proxy = FALSE, quiet = TRUE)
+st_crs(sardSDMs) <- "+proj=longlat +ellps=WGS84 +datum=WGS84"
+sardSDMs <- st_transform(sardSDMs, "+proj=longlat +ellps=WGS84 +datum=WGS84")
+#st_get_dimension_values(sardSDMs, "time")
+
+# Use CalCurrent Atlantis extent to limit sample frame
+ccAtl <- st_read("C:/Users/r.wildermuth/Documents/FutureSeas/MapFiles/emocc_whole_domain.shp")
+ccAtl <- st_transform(ccAtl, "+proj=longlat +ellps=WGS84 +datum=WGS84")
+
+# restrict to area south of 40deg N
+newAtlbbox <- st_bbox(ccAtl)
+newAtlbbox$ymax <- 40.0
+newAtlbbox <- st_bbox(unlist(newAtlbbox))
+ccAtl <- st_crop(ccAtl, newAtlbbox)
+
+# crop to Atlantis extent
+sardSDMs <- st_crop(x = sardSDMs,
+                      y = ccAtl)
+
+# show first 5 days of SDM
+sardSlice <- slice(sardSDMs, index = 1:5, along = "time")
+ggplot() + geom_stars(data = sardSlice) + facet_wrap(~time)
+
+# Calculate high probability habitat
+probMean <- mean(sardSDMs$sard_3_1998_GAM_noSSB.nc, na.rm = TRUE)
+probSD <- sd(sardSDMs$sard_3_1998_GAM_noSSB.nc, na.rm = TRUE)
+upper95 <- probMean + 1.96*probSD
+# discrimination threshold from Barb Muhling:
+sardHabThresh <- 0.42
+
+# Try masking low probability cells
+sardSpawn <- sardSDMs
+sardSpawn[sardSDMs < sardHabThresh] <- NA
+# Don't allow spawning habitat above 40deg north
+#sardSpawn2 <- sardSpawn %>% filter(y < 40)
+
+sardSpawnSlice <- slice(sardSpawn, index = 150:160, along = "time")
+#ggplot() + geom_stars(data = sardSpawnSlice) + facet_wrap(~time)
+
+# Map prep
+pac.coast <- borders("world", colour="gray50", fill="gray50", xlim = c(-140, -100), ylim = c(20, 60))
+mycols <- colors()[c(473,562,71,610,655,653,621,34)]
+mypalette <- colorRampPalette(mycols)(255)
+
+ggplot() +
+  geom_stars(data = sardSpawnSlice) +
+  scale_fill_gradientn(colours = mypalette, limits = c(0, 0.8), na.value = NA) +
+  guides(fill = guide_colorbar(barwidth=0.5, barheight=5)) +
+  pac.coast + 
+  geom_sf(data = ccAtl, color = "black", size = 1.5, fill = NA) +
+  coord_sf(xlim = c(-130, -113), ylim = c(27, 42)) +
+  facet_wrap(~time)
+
+sardSpawnYr <- aggregate(sardSpawn, by = "years", FUN = sum, na.rm = TRUE)
+st_get_dimension_values(sardSpawnYr, "time")
+
+ggplot() +
+  geom_stars(data = aperm(sardSpawnYr, c(2,3,1))) +
+  scale_fill_gradientn(colours = mypalette,
+                       limits = c(0, max(sardSpawnYr$sard_3_1998_GAM_noSSB.nc,
+                                         na.rm = TRUE)),
+                       na.value = NA) +
+  guides(fill = guide_colorbar(barwidth=0.5, barheight=5)) +
+  pac.coast +
+  geom_sf(data = ccAtl, color = "black", size = 1.5, fill = NA) +
+  coord_sf(xlim = c(-130, -115), ylim = c(28, 42)) +
+  facet_wrap(~time)
+
+sardSpawnHab <- aggregate(sardSpawnYr, ccAtl, FUN = sum, na.rm = TRUE)
+
+#--- Anchovy --------------------------
+anchFiles <- expand.grid("anch", 2:4, 1998:2018, "GAM_noSSB.nc") %>% 
+                    mutate(sdmFile = paste(Var1, Var2, Var3, Var4, sep = "_")) %>%
+                    pull(sdmFile)
+
+anchFiles <- paste0(datPath, "SDMoutput/anchovy_noSSB/", anchFiles)
+anchSDMs <- read_stars(anchFiles, proxy = FALSE, quiet = TRUE)
+st_crs(anchSDMs) <- "+proj=longlat +ellps=WGS84 +datum=WGS84"
+anchSDMs <- st_transform(anchSDMs, "+proj=longlat +ellps=WGS84 +datum=WGS84")
+#st_get_dimension_values(anchSDMs, "time")
+
+# crop to Atlantis extent
+anchSDMs <- st_crop(x = anchSDMs,
+                      y = ccAtl)
+
+# show first 5 days of SDM
+anchSlice <- slice(anchSDMs, index = 1:5, along = "time")
+ggplot() + geom_stars(data = anchSlice) + facet_wrap(~time)
+
+# Calculate high probability habitat
+probMean <- mean(anchSDMs$anch_2_1998_GAM_noSSB.nc, na.rm = TRUE)
+probSD <- sd(anchSDMs$anch_2_1998_GAM_noSSB.nc, na.rm = TRUE)
+upper95 <- probMean + 1.96*probSD
+# discrimination threshold from Barb Muhling:
+anchHabThresh <- 0.30
+
+# Try masking low probability cells
+anchSpawn <- anchSDMs
+anchSpawn[anchSDMs < anchHabThresh] <- NA
+
+anchSpawnSlice <- slice(anchSpawn, index = 150:160, along = "time")
+#ggplot() + geom_stars(data = sardSpawnSlice) + facet_wrap(~time)
+
+ggplot() +
+  geom_stars(data = anchSpawnSlice) +
+  scale_fill_gradientn(colours = mypalette, limits = c(0, 0.8), na.value = NA) +
+  guides(fill = guide_colorbar(barwidth=0.5, barheight=5)) +
+  pac.coast + 
+  geom_sf(data = ccAtl, color = "black", size = 1.5, fill = NA) +
+  coord_sf(xlim = c(-130, -113), ylim = c(27, 42)) +
+  facet_wrap(~time)
+
+anchSpawnYr <- aggregate(anchSpawn, by = "years", FUN = sum, na.rm = TRUE)
+st_get_dimension_values(anchSpawnYr, "time")
+
+ggplot() +
+  geom_stars(data = aperm(anchSpawnYr, c(2,3,1))) +
+  scale_fill_gradientn(colours = mypalette,
+                       limits = c(0, max(anchSpawnYr$anch_2_1998_GAM_noSSB.nc,
+                                         na.rm = TRUE)),
+                       na.value = NA) +
+  guides(fill = guide_colorbar(barwidth=0.5, barheight=5)) +
+  pac.coast +
+  geom_sf(data = ccAtl, color = "black", size = 1.5, fill = NA) +
+  coord_sf(xlim = c(-130, -115), ylim = c(28, 42)) +
+  facet_wrap(~time)
+
+anchSpawnHab <- aggregate(anchSpawnYr, ccAtl, FUN = sum, na.rm = TRUE)
+spawnTS <- data.frame(year = 1998:2018,
+                      sardSpawnHab = t(sardSpawnHab$sard_3_1998_GAM_noSSB.nc),
+                      anchSpawnHab = t(anchSpawnHab$anch_2_1998_GAM_noSSB.nc))
+
+spawnTS %>% pivot_longer(cols = c("sardSpawnHab", "anchSpawnHab")) %>%
+  ggplot() +
+  geom_line(aes(x = year, y = value, col = name))
+```
+
+## Spawning season timing and duration
+Two options for spawning timing:
+1. Hierarchical process of determining spawning area from yearly maps using rules for spawning area to create possible spawning area polygon, then indicating date at which some threshold of cells reach breeding habitat probability threshold within that area.
+2. Similar to 1), but using polygon derived from CalCOFI stations with high proportion of larval catches throughout the survey.
