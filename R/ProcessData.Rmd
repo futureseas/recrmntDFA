@@ -17,6 +17,7 @@ library(lubridate)
 library(sf)
 library(stars)
 library(cubelyr)
+library(r4ss)
 ```
 
 # California Current Integrated Ecosystem Assessment data
@@ -30,7 +31,8 @@ datPath <- "C:/Users/r.wildermuth/Documents/FutureSeas/RecruitmentIndex/DFA_data
 datFiles <- list.files(datPath)
 datFiles <- datFiles[-which(datFiles %in% c("Anchovy_Sardine_len_wt_age.csv", 
                                               "AtlantisModel_C_biomass_data_31Mar2021.csv",
-                                              "SDMoutput"))]
+                                              "SDMoutput",
+                                            "anchovySSfiles"))]
 
 # df names
 datNames <- sub("_dl20230109.csv", "", datFiles)
@@ -53,9 +55,9 @@ datDict <- data.frame(Variable = datNames,
                                       "Spring Transition Index at 33N",
                                       "Spring Transition Index at 36N",
                                       "Spring Transition Index at 39N",
-                                      "Total Spring CalCOFI larval anchovy (ln(n+1)/10m^2)",
-                                      "Total Spring CalCOFI larval sardine (ln(n+1)/10m^2)",
-                                      "Total Spring CalCOFI larval southern mesopelagics (ln(n+1)/10m^2)",
+                                      "Total spring CalCOFI larval anchovy (ln(n+1)/10m^2)",
+                                      "Total spring CalCOFI larval sardine (ln(n+1)/10m^2)",
+                                      "Total spring CalCOFI larval southern mesopelagics (ln(n+1)/10m^2)",
                                       "Mean myctophids in SWFSC Rockfish Recruitment & Ecosystem Assessment Survey (log(CPUE+1))"),
                       Source = "CCIEA")
 datDict
@@ -76,14 +78,68 @@ recrDat <- lapply(mget(datNames),
                                   select(-time)})
 
 # ---- Aggregate monthly measures for annual time series ------
+# NPGO indicator of forage, aggregate May - July
+recrDat$OC_NPGO <- recrDat$OC_NPGO %>% filter(month %in% 5:7) %>%
+                      group_by(year) %>%
+                      summarize(NPGO = mean(OC_NPGO))
 
+# PDO indicator of preconditioning, aggregate March - July, Aug - Oct
+recrDat$OC_PDO <- recrDat$OC_PDO %>% filter(month %in% 3:10) %>%
+                      mutate(seas = case_when(month %in% 3:7 ~ "spring",
+                                              month %in% 8:10 ~ "summer")) %>%
+                      group_by(year, seas) %>%
+                      summarize(PDO = mean(OC_PDO)) %>% 
+                      pivot_wider(names_from = seas, names_prefix = "PDO",
+                                  values_from = PDO)
+
+# NOI indicator of forage, aggregate March - July
+recrDat$OC_NOI <- recrDat$OC_NOI %>% filter(month %in% 3:7) %>%
+                      group_by(year) %>%
+                      summarize(NOI = mean(OC_NOI))
+
+# ENSO indicator of forage, aggregate March - July
+recrDat$OC_MultiENSOindx <- recrDat$OC_MultiENSOindx %>% filter(month %in% 3:7) %>%
+                              group_by(year) %>%
+                              summarize(ENSO = mean(OC_MultiENSOindx))
+
+# BEUTI indicator of forage, aggregate May - July
+recrDat$OC_BEUTI_33N <- recrDat$OC_BEUTI_33N %>% filter(month %in% 5:7) %>%
+                          group_by(year) %>%
+                          summarize(BEUTI_33N = mean(OC_BEUTI_33N))
+recrDat$OC_BEUTI_39N <- recrDat$OC_BEUTI_39N %>% filter(month %in% 5:7) %>%
+                          group_by(year) %>%
+                          summarize(BEUTI_39N = mean(OC_BEUTI_39N))
+
+# HCI indicator of preconditioning, aggregate March - July
+recrDat$EI_HCI <- recrDat$EI_HCI %>% filter(month %in% 3:7) %>%
+                              group_by(year) %>%
+                              summarize(HCI = mean(EI_HCI))
+
+# COPepod community indicator of preconditioning and forage, aggregate March - July, Aug - Oct
+recrDat$EI_NorthernCOP_44.6N <- recrDat$EI_NorthernCOP_44.6N %>% filter(month %in% 3:10) %>%
+                      mutate(seas = case_when(month %in% 3:7 ~ "spring",
+                                              month %in% 8:10 ~ "summer")) %>%
+                      group_by(year, seas) %>%
+                      summarize(NCOP = mean(EI_NorthernCOP_44.6N)) %>% 
+                      pivot_wider(names_from = seas, names_prefix = "NCOP",
+                                  values_from = NCOP)
+
+recrDat$EI_SouthernCOP_44.6N <- recrDat$EI_SouthernCOP_44.6N %>% filter(month %in% 3:10) %>%
+                      mutate(seas = case_when(month %in% 3:7 ~ "spring",
+                                              month %in% 8:10 ~ "summer")) %>%
+                      group_by(year, seas) %>%
+                      summarize(SCOP = mean(EI_SouthernCOP_44.6N)) %>% 
+                      pivot_wider(names_from = seas, names_prefix = "SCOP",
+                                  values_from = SCOP)
 
 # collapses dfs into single wide table
-recrDat <- recrDat %>% reduce(full_join, by = c("year", "month"))
+recrDat <- recrDat %>% reduce(full_join, by = "year") 
+recrDat <- recrDat %>% select(-starts_with("month", vars = names(recrDat))) %>%
+              arrange(year)
 
-recrDat %>% pivot_longer(cols = c(-year, -month), names_to = "Index", values_to = "vals") %>%
+recrDat %>% pivot_longer(cols = c(-year), names_to = "Index", values_to = "vals") %>%
   filter(!is.na(vals), year >= 1950, year != 2020) %>%
-  ggplot(aes(x = year, y = vals, color = as.character(month))) +
+  ggplot(aes(x = year, y = vals)) +
   geom_line() +
   facet_wrap(~Index, scales = "free_y") +
   theme_classic()
@@ -113,6 +169,14 @@ waa %>% group_by(commonName, year, seas) %>%
   ggplot(aes(x = year, y = meanWt, color = seas)) +
   geom_line() +
   facet_wrap(~commonName, scales = "free_y") +
+  labs(y = "Mean weight (g)")
+
+# WAA from fishery data used in SS
+waaFishery <- read_csv(paste0(datPath, "anchovySSfiles/anchovy_formatted_wtatage_for_Robert.csv"))
+
+waaFishery %>% ggplot(aes(x = modelyear, y = a1, color = as.character(Seas))) +
+  geom_line() +
+  # facet_wrap(~commonName, scales = "free_y") +
   labs(y = "Mean weight (g)")
 ```
 # Zooplankton data
@@ -309,3 +373,86 @@ spawnTS %>% pivot_longer(cols = c("sardSpawnHab", "anchSpawnHab")) %>%
 Two options for spawning timing:
 1. Hierarchical process of determining spawning area from yearly maps using rules for spawning area to create possible spawning area polygon, then indicating date at which some threshold of cells reach breeding habitat probability threshold within that area.
 2. Similar to 1), but using polygon derived from CalCOFI stations with high proportion of larval catches throughout the survey.
+
+# Assessment biomass and recruitment
+Use Stock Synthesis-based estimates of biomass and recruitment as index variables
+```{r}
+# sardine - use r4ss package to read in from research model folder
+sardVals <- SS_output("C:/Users/r.wildermuth/Documents/FutureSeas/sardine_research_assessment",
+                      verbose = FALSE, printstats = FALSE)
+
+sardBio <- sardVals$timeseries %>% filter(Era == "TIME") %>%
+              select(Yr, Seas, Bio_smry) %>% 
+              pivot_wider(names_from = Seas, names_prefix = "sardBioSmrySeas",
+                          values_from = Bio_smry)
+
+sardRec <- sardVals$recruit %>% filter(era == "Main") %>%
+              select(Yr, dev) %>%
+              rename(sardRec = dev)
+
+sardBio %>% ggplot(aes(x = Yr, y = sardBioSmrySeas1)) +
+  geom_line()
+
+sardRec %>% ggplot(aes(x = Yr, y = sardRec)) +
+  geom_line()
+
+# anchovy
+anchBio <- read_csv(paste0(datPath, "anchovySSfiles/anchovy_bio_timeseries_data_for_Robert.csv"))
+anchBio <- anchBio %>% filter(Era == "TIME") %>%
+              select(Yr, Seas, Bio_smry) %>% 
+              pivot_wider(names_from = Seas, names_prefix = "anchBioSmrySeas",
+                          values_from = Bio_smry)
+
+anchRec <- read_csv(paste0(datPath, "anchovySSfiles/anchovy_rec_data_for_Robert.csv"))
+anchRec <- anchRec %>% filter(era == "Main") %>%
+              select(Yr, dev) %>%
+              rename(anchRec = dev)
+
+anchBio %>% ggplot(aes(x = Yr, y = anchBioSmrySeas1)) +
+  geom_line()
+
+anchRec %>% ggplot(aes(x = Yr, y = anchRec)) +
+  geom_line()
+```
+
+```{r}
+# compile and save data for analysis
+
+# only spring sardine have decent number of observations
+waa <- waa %>% filter(age == 1, seas == "spring", 
+                      commonName == "Pacific sardine (pilchard)") %>%
+          rename(age1SprSardmeanWAA = avgWAA) %>% ungroup() %>%
+          select(year, age1SprSardmeanWAA)
+# Use observed fishery-dependent waa for anchovy
+# Note: gap in observations between 1988-2013, so may only be useful for longer-term analysis in STAN
+waaFishery <- waaFishery %>% filter(Seas == 1) %>%
+                select(modelyear, a1) %>%
+                rename(year = modelyear,
+                       age1SprAnchmeanWAA = a1)
+
+# take only small zooplkn groups in spring for larvae forage
+zooplkn <- zooplkn %>% group_by(Class, year, seas) %>%
+              summarize(meanZooplkn = mean(`Carbon Biomass Sum (mgC m-2)`)) %>%
+              filter(Class %in% c("all_calanoid_copepods","All_Copepods", 
+                                  "nauplii", "eggs", "euphausiids"),
+                     seas == "spring") %>%
+              pivot_wider(names_from = Class, values_from = meanZooplkn) %>%
+              select(-seas)
+
+
+
+# Join SS output and change name of 'Yr' once
+outSS3 <- sardBio %>% full_join(sardRec, anchBio, by = "Yr")  %>% 
+            full_join(anchBio, by = "Yr") %>% 
+            full_join(anchRec, by = "Yr") %>%
+            rename(year = Yr)
+
+# Combine everything together and save
+recrDat <- recrDat %>% full_join(waa, by = "year") %>%
+              full_join(waaFishery, by = "year") %>%
+              full_join(zooplkn, by = "year") %>%
+              full_join(spawnTS, by = "year") %>%
+              full_join(outSS3, by = "year")
+
+write_csv(recrDat, file = "C:/Users/r.wildermuth/Documents/FutureSeas/RecruitmentIndex/recrmntDFA/recrDFAdat.csv")
+```
