@@ -172,7 +172,15 @@ waa %>% group_by(commonName, year, seas) %>%
   labs(y = "Mean weight (g)")
 
 # WAA from fishery data used in SS
-waaFishery <- read_csv(paste0(datPath, "anchovySSfiles/anchovy_formatted_wtatage_for_Robert.csv"))
+# From Charlie Hinchliff on 4/4/2023:
+# The model is based on a June-May biological year (aka ‘model year’), with two 
+# semester-based seasons (5 & 7 months) per year (S1 is Jun-Dec, and S2 is Jan-May).
+# and:
+# for 'model year' S2 will actually correspond to the following calendar year 
+# i.e., fish in 'model year-season' 2015-2 were caught at the beginning of 2016 (Jan-May).
+# This will be the same for biomass output too.
+waaFishery <- read_csv(paste0(datPath,
+                              "anchovySSfiles/anchovy_formatted_wtatage_for_Robert.csv"))
 
 waaFishery %>% ggplot(aes(x = modelyear, y = a1, color = as.character(Seas))) +
   geom_line() +
@@ -382,7 +390,11 @@ sardVals <- SS_output("C:/Users/r.wildermuth/Documents/FutureSeas/sardine_resear
                       verbose = FALSE, printstats = FALSE)
 
 sardBio <- sardVals$timeseries %>% filter(Era == "TIME") %>%
-              select(Yr, Seas, Bio_smry) %>% 
+              # account for model year + S2 = next calendar year
+              mutate(Yr = as.numeric(Yr),
+                     year = case_when(Seas == 2 ~ Yr + 1,
+                                      TRUE ~ Yr)) %>%
+              select(year, Seas, Bio_smry) %>% 
               pivot_wider(names_from = Seas, names_prefix = "sardBioSmrySeas",
                           values_from = Bio_smry)
 
@@ -390,7 +402,7 @@ sardRec <- sardVals$recruit %>% filter(era == "Main") %>%
               select(Yr, dev) %>%
               rename(sardRec = dev)
 
-sardBio %>% ggplot(aes(x = Yr, y = sardBioSmrySeas1)) +
+sardBio %>% ggplot(aes(x = year, y = sardBioSmrySeas1)) +
   geom_line()
 
 sardRec %>% ggplot(aes(x = Yr, y = sardRec)) +
@@ -399,7 +411,10 @@ sardRec %>% ggplot(aes(x = Yr, y = sardRec)) +
 # anchovy
 anchBio <- read_csv(paste0(datPath, "anchovySSfiles/anchovy_bio_timeseries_data_for_Robert.csv"))
 anchBio <- anchBio %>% filter(Era == "TIME") %>%
-              select(Yr, Seas, Bio_smry) %>% 
+              # account for model year + S2 = next calendar year
+              mutate(year = case_when(Seas == 2 ~ Yr + 1,
+                                      TRUE ~ Yr)) %>%
+              select(year, Seas, Bio_smry) %>% 
               pivot_wider(names_from = Seas, names_prefix = "anchBioSmrySeas",
                           values_from = Bio_smry)
 
@@ -408,7 +423,7 @@ anchRec <- anchRec %>% filter(era == "Main") %>%
               select(Yr, dev) %>%
               rename(anchRec = dev)
 
-anchBio %>% ggplot(aes(x = Yr, y = anchBioSmrySeas1)) +
+anchBio %>% ggplot(aes(x = year, y = anchBioSmrySeas2)) +
   geom_line()
 
 anchRec %>% ggplot(aes(x = Yr, y = anchRec)) +
@@ -425,10 +440,11 @@ waa <- waa %>% filter(age == 1, seas == "spring",
           select(year, age1SprSardmeanWAA)
 # Use observed fishery-dependent waa for anchovy
 # Note: gap in observations between 1988-2013, so may only be useful for longer-term analysis in STAN
-waaFishery <- waaFishery %>% filter(Seas == 1) %>%
-                select(modelyear, a1) %>%
-                rename(year = modelyear,
-                       age1SprAnchmeanWAA = a1)
+waaFishery <- waaFishery %>% filter(Seas == 2) %>%
+                # account for model year + S2 being in next calendar year
+                mutate(year = modelyear + 1) %>%
+                select(year, a1) %>%
+                rename(age1SprAnchmeanWAA = a1)
 
 # take only small zooplkn groups in spring for larvae forage
 zooplkn <- zooplkn %>% group_by(Class, year, seas) %>%
@@ -442,9 +458,7 @@ zooplkn <- zooplkn %>% group_by(Class, year, seas) %>%
 
 
 # Join SS output and change name of 'Yr' once
-outSS3 <- sardBio %>% full_join(sardRec, anchBio, by = "Yr")  %>% 
-            full_join(anchBio, by = "Yr") %>% 
-            full_join(anchRec, by = "Yr") %>%
+outSS3 <- anchRec %>% full_join(sardRec, by = "Yr")  %>% 
             rename(year = Yr)
 
 # Combine everything together and save
@@ -452,7 +466,9 @@ recrDat <- recrDat %>% full_join(waa, by = "year") %>%
               full_join(waaFishery, by = "year") %>%
               full_join(zooplkn, by = "year") %>%
               full_join(spawnTS, by = "year") %>%
-              full_join(outSS3, by = "year")
+              full_join(outSS3, by = "year") %>%
+              full_join(anchBio, by = "year") %>%
+              full_join(sardBio, by = "year")
 
 write_csv(recrDat, file = "C:/Users/r.wildermuth/Documents/FutureSeas/RecruitmentIndex/recrmntDFA/recrDFAdat.csv")
 ```

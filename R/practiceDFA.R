@@ -12,6 +12,11 @@ library(lubridate)
 datPath <- "C:/Users/r.wildermuth/Documents/FutureSeas/RecruitmentIndex/DFA_data/"
 datFiles <- list.files(datPath)
 
+datFiles <- datFiles[-which(datFiles %in% c("Anchovy_Sardine_len_wt_age.csv", 
+                                            "AtlantisModel_C_biomass_data_31Mar2021.csv",
+                                            "SDMoutput",
+                                            "anchovySSfiles"))]
+
 # This won't collate on year-month before joining dfs
 # df <-
 #   list.files(path = datPath, pattern = "*.csv") %>% 
