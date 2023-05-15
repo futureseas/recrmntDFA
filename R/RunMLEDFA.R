@@ -32,7 +32,8 @@ sardDat <- sardDat %>% select(-year) %>% t()
 simpleDFA <- MARSS(y = sardDat, 
                    form = "dfa",
                    control = list(maxit = 1000,
-                                  allow.degen = TRUE),
+                                  allow.degen = TRUE,
+                                  conv.test.slope.tol = 0.1),
                    inits = list(x0 = matrix(1, 1, 1)),
                    z.score = TRUE,
                    model = list(#R = "diagonal and equal", # observation errors are the same
@@ -45,20 +46,20 @@ simpleDFA <- MARSS(y = sardDat,
 
 # plot(c(1990:2019), y= simpleDFA$states, type = "l")
 # abline(h = 0)
-# 
-# # plot loadings
-# # new df with coordinates
-# loadingsDF <- data.frame(index = datNames,
-#                          vals = simpleDFA$par$Z, 
-#                          dummy0 = 0)
-# 
-# loadingsDF %>% ggplot(aes(y = index)) +
-#   geom_segment(aes(x = dummy0,
-#                    yend = index,
-#                    xend = vals)) +
-#   labs(x = "Loadings", y = "Index") +
-#   geom_vline(xintercept = 0, color = "grey") +
-#   theme_classic()
+
+# plot loadings
+# new df with coordinates
+loadingsDF <- data.frame(index = datNames,
+                         vals = simpleDFA$par$Z,
+                         dummy0 = 0)
+
+loadingsDF %>% ggplot(aes(y = index)) +
+  geom_segment(aes(x = dummy0,
+                   yend = index,
+                   xend = vals)) +
+  labs(x = "Loadings", y = "Index") +
+  geom_vline(xintercept = 0, color = "grey") +
+  theme_classic()
 
 # fits to data from pg 137 in MARSS User Guide
 alpha <- 0.05 
@@ -158,8 +159,8 @@ anchDat <- datDFA %>% filter(year %in% 1990:2019) %>%
 # remove contemporary adult biomass with recruits, should be S2 biomass -> S1 recs
 anchDat <- anchDat %>% select(-c(All_Copepods,
                                  anchBioSmrySeas1,
-                                 anchBioSmrySeas2,
-                                 anchRec,
+                                 # anchBioSmrySeas2,
+                                 # anchRec,
                                  age1SprAnchmeanWAA)) # not enough data in time window
 
 datNames <- names(anchDat)[-1]
@@ -172,7 +173,8 @@ anchDat <- anchDat %>% select(-year) %>% t()
 anchDFA <- MARSS(y = anchDat, 
                    form = "dfa",
                    control = list(maxit = 1000,
-                                  allow.degen = TRUE),
+                                  allow.degen = TRUE,
+                                  conv.test.slope.tol = 0.1),
                    inits = list(x0 = matrix(1, 1, 1)),
                    z.score = TRUE,
                    model = list(#R = "diagonal and equal", # observation errors are the same
@@ -185,20 +187,20 @@ anchDFA <- MARSS(y = anchDat,
 
 # plot(c(1990:2019), y= anchDFA$states, type = "l")
 # abline(h = 0)
-# 
-# # plot loadings
-# # new df with coordinates
-# loadingsDF <- data.frame(index = datNames,
-#                          vals = anchDFA$par$Z, 
-#                          dummy0 = 0)
-# 
-# loadingsDF %>% ggplot(aes(y = index)) +
-#   geom_segment(aes(x = dummy0,
-#                    yend = index,
-#                    xend = vals)) +
-#   labs(x = "Loadings", y = "Index") +
-#   geom_vline(xintercept = 0, color = "grey") +
-#   theme_classic()
+
+# plot loadings
+# new df with coordinates
+loadingsDF <- data.frame(index = datNames,
+                         vals = anchDFA$par$Z,
+                         dummy0 = 0)
+
+loadingsDF %>% ggplot(aes(y = index)) +
+  geom_segment(aes(x = dummy0,
+                   yend = index,
+                   xend = vals)) +
+  labs(x = "Loadings", y = "Index") +
+  geom_vline(xintercept = 0, color = "grey") +
+  theme_classic()
 
 # fits to data from pg 137 in MARSS User Guide
 alpha <- 0.05 
@@ -288,19 +290,24 @@ for (i in 1:dim(ts.trends)[2]) {
 # subset for anchovy DFA from 1990 to 2019
 allDat <- datDFA %>% filter(year %in% 1990:2019) %>%
             # remove contemporary adult biomass with recruits, should be S2 biomass -> S1 recs
-            select(-c(All_Copepods,
-                      anchBioSmrySeas1, 
+            select(-c(NOI,
+                      ENSO,
+                      NPGO,
+                      All_Copepods, # ~same as calanoid copepods
+                      euphausiids, # too large for larval mouth gape
+                      anchBioSmrySeas1,
                       sardBioSmrySeas1,
                       anchBioSmrySeas2, # leave out biomass since not fit well
                       sardBioSmrySeas2,
-                      NCOPspring,
-                      SCOPspring, # summer copepod index had higher loadings
+                      # NCOPspring,
+                      # SCOPspring, # summer copepod index had higher loadings
                       PDOsummer, # lower loading than spring, may want to try a lag
-                      BEUTI_33N, # oceanography at 39N had highest loadings
-                      OC_LUSI_33N,
-                      OC_LUSI_36N,
-                      OC_STI_33N,
-                      OC_STI_36N,
+                      PDOspring,
+                      # BEUTI_33N, # oceanography at 39N had highest loadings
+                      # OC_LUSI_33N,
+                      # OC_LUSI_36N,
+                      # OC_STI_33N,
+                      # OC_STI_36N,
                       age1SprAnchmeanWAA)) # not enough data in time windowselect(-c(#sprCalCOFILarvalSardine,
 
 datNames <- names(allDat)[-1]
@@ -308,49 +315,38 @@ datNames <- names(allDat)[-1]
 # transpose for MARSS formatting
 allDat <- allDat %>% select(-year) %>% t()
 
-# do simple DFA fit
+
+# Create a custom R obs error matrix assuming each data source has it's own common error
+Rcustom <- matrix(list(0),length(datNames),length(datNames)) 
+diag(Rcustom) <- c("HCI",
+                   "COP", "COP", "COP", "COP",
+                   "BEUTI", "BEUTI", 
+                   "LUSI", "LUSI", "LUSI", 
+                   "STI", "STI", "STI",
+                   "CalCOFI", "CalCOFI", "CalCOFI",
+                   "RREAS",
+                   "WAA",
+                   "PRPOOS", "PRPOOS", "PRPOOS", "PRPOOS", "PRPOOS", #"PRPOOS", "PRPOOS",
+                   "SDM", "SDM", 
+                   "anchRec", 
+                   "sardRec")
+                   # ,"anchBio",
+                   # "sardBio")
 
 overallDFA <- MARSS(y = allDat, 
                  form = "dfa",
-                 control = list(maxit = 2000,
+                 control = list(maxit = 5000,
+                                conv.test.slope.tol = 0.1,
                                 allow.degen = TRUE),
                  inits = list(x0 = matrix(1, 1, 1)),
                  z.score = TRUE,
                  model = list(#R = "diagonal and equal", # observation errors are the same
-                               R = "diagonal and unequal", # observation errors independent
-                               #R = "equalvarcov", # observation errors equal and covars equal
-                               #R = "unconstrained", # all observation errors independent
-                               m = 1) # one latent process
+                               # R = "diagonal and unequal", # observation errors independent
+                               # R = "equalvarcov", # observation errors equal and covars equal
+                               # R = "unconstrained", # all observation errors independent
+                               R = Rcustom,
+                               m = 2) # one latent process
 )
-# Second trend is mostly explained by missing data in the zooplankton dataset. Stick to one trend
-
-# plot(c(1990:2019), y= overallDFA$states, type = "l")
-# abline(h = 0)
-# 
-# # plot loadings
-# # new df with coordinates
-# loadingsDF <- data.frame(index = datNames,
-#                          vals = overallDFA$par$Z,
-#                          dummy0 = 0)
-# 
-# loadingsDF %>% ggplot(aes(y = index)) +
-#   geom_segment(aes(x = dummy0,
-#                    yend = index,
-#                    xend = vals)) +
-#   labs(x = "Loadings", y = "Index") +
-#   geom_vline(xintercept = 0, color = "grey") +
-#   theme_classic()
-
-# fits to data from pg 137 in MARSS User Guide
-alpha <- 0.05 
-d <- residuals(overallDFA, type = "tT") 
-d$up <- qnorm(1- alpha / 2) * d$.sigma + d$.fitted 
-d$lo <- qnorm(alpha / 2) * d$.sigma + d$.fitted 
-ggplot(data = subset(d, name=="model")) + 
-  geom_point(aes(t, value)) + 
-  geom_ribbon(aes(x = t, ymin = lo, ymax = up), linetype = 2, alpha = 0.2) + 
-  geom_line(aes(t, .fitted), col="blue") + 
-  facet_wrap(~.rownames) + xlab("Time Step") + ylab("Count")
 
 # Look at factor loadings
 # get the inverse of the rotation matrix 
@@ -375,6 +371,39 @@ Z.rot.low <- Z.low %*% H.inv
 df <- data.frame(est = as.vector(Z.rot), 
                  conf.up = as.vector(Z.rot.up), 
                  conf.low = as.vector(Z.rot.low) )
+
+# plot(c(1990:2019), y= overallDFA$states, type = "l")
+# abline(h = 0)
+# 
+# plot loadings
+# new df with coordinates
+loadingsDF <- data.frame(index = datNames,
+                         trend1 = Z.rot[, 1],
+                         trend2 = Z.rot[, 2], 
+                         dummy0 = 0) %>%
+                pivot_longer(cols = c(trend1, trend2), names_to = "Trend")
+
+loadingsDF %>% ggplot(aes(y = index)) +
+  geom_segment(aes(x = dummy0,
+                   yend = index,
+                   xend = value)) +
+  facet_wrap(~Trend) +
+  labs(x = "Loadings", y = "Index") +
+  geom_vline(xintercept = 0, color = "grey") +
+  theme_classic()
+
+# fits to data from pg 137 in MARSS User Guide
+alpha <- 0.05 
+d <- residuals(overallDFA, type = "tT") 
+d$up <- qnorm(1- alpha / 2) * d$.sigma + d$.fitted 
+d$lo <- qnorm(alpha / 2) * d$.sigma + d$.fitted 
+ggplot(data = subset(d, name=="model")) + 
+  geom_point(aes(t, value)) + 
+  geom_ribbon(aes(x = t, ymin = lo, ymax = up), linetype = 2, alpha = 0.2) + 
+  geom_line(aes(t, .fitted), col="blue") + 
+  facet_wrap(~.rownames) + xlab("Time Step") + ylab("Count")
+
+
 
 # plot the factor loadings 
 spp <- rownames(allDat) 
@@ -420,7 +449,7 @@ for (i in 1:dim(ts.trends)[2]) {
   )
   # add panel labels
   mtext(paste("Trend", i, sep = " "), side = 3, line = 0.5)
-  axis(1, 12 * (0:dim(allDat)[2]) + 1, 1980 + 0:dim(allDat)[2])
+  axis(1,  (0:dim(allDat)[2]) , 1990 + 0:dim(allDat)[2])
 } # end i loop (trends)
 
 

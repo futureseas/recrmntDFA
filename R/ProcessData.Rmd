@@ -32,7 +32,9 @@ datFiles <- list.files(datPath)
 datFiles <- datFiles[-which(datFiles %in% c("Anchovy_Sardine_len_wt_age.csv", 
                                               "AtlantisModel_C_biomass_data_31Mar2021.csv",
                                               "SDMoutput",
-                                            "anchovySSfiles"))]
+                                            "anchovySSfiles",
+                                            "SpringPRPOOSdata_Copepods_sizeFractions.csv",
+                                            "SpringPRPOOSdata_Nauplii_sizeFractions.csv"))]
 
 # df names
 datNames <- sub("_dl20230109.csv", "", datFiles)
@@ -220,6 +222,70 @@ zooplkn %>% group_by(Class, year, seas) %>%
   ggplot(aes(x = year, y = meanZooplkn, color = seas)) +
   geom_line() +
   facet_wrap(~Class, scales = "free_y")
+```
+Size fraction data for nauplii and copepods
+```{r}
+copepodSize <- read_csv(file= paste0(datPath, "SpringPRPOOSdata_Copepods_sizeFractions.csv"),
+                    na = "NaN")
+copepodSize <- copepodSize %>% mutate(Time_PST = dmy_hms(Time_PST),
+                                      year = year(Time_PST), month = month(Time_PST)) %>%
+                  filter(!is.na(year),
+                         Night0Day1 == 1) # larvae only forage during day
+
+# need to get total biomass C per year
+copTotBio <- copepodSize %>% group_by(year) %>%
+              summarize(totBio = sum(Carbon_mg_sum))
+
+copMeanSize <- copepodSize %>% 
+                  mutate(size = str_match(string = `Size Range (Major Axis)`, pattern = "-\\s*(.*?)\\s*mm")[,2],
+                         size = as.numeric(size),
+                         numProd = size * ugcarbon_n) %>%
+                  group_by(year, `Size Range (Major Axis)`, size) %>%
+                  summarize(totSize = sum(ugcarbon_n),
+                            copMeanSize = sum(numProd),
+                            copBioSize = sum(Carbon_mg_sum)) %>%
+                  full_join(y = copTotBio, by = "year") %>% 
+                  mutate(copPropBioSize = (copBioSize/totBio)*(size-0.25)) %>%
+                  group_by(year) %>%
+                  summarize(totSize = sum(totSize),
+                            copMeanSize = sum(copMeanSize),
+                            copPropBioSize = sum(copPropBioSize)) %>%
+                  mutate(copMeanSize = copMeanSize/totSize)
+
+copMeanSize %>% ggplot(aes(x = year, y = copMeanSize)) +
+  geom_line() +
+  labs(y = "Mean copepod size in spring (mm)")
+
+# -- nauplii
+naupliiSize <- read_csv(file= paste0(datPath, "SpringPRPOOSdata_Nauplii_sizeFractions.csv"),
+                    na = "NaN")
+naupliiSize <- naupliiSize %>% mutate(Time_PST = dmy_hms(Time_PST),
+                                      year = year(Time_PST), month = month(Time_PST)) %>%
+                  filter(!is.na(year))
+
+# need to get total biomass C per year
+naupTotBio <- naupliiSize %>% group_by(year) %>%
+              summarize(totBio = sum(Carbon_mg_sum))
+
+naupMeanSize <- naupliiSize %>% 
+                  mutate(size = str_match(string = `Size Range (Major Axis)`, pattern = "-\\s*(.*?)\\s*mm")[,2],
+                         size = as.numeric(size),
+                         numProd = size * ugcarbon_n) %>%
+                  group_by(year, `Size Range (Major Axis)`, size) %>%
+                  summarize(totSize = sum(ugcarbon_n),
+                            naupMeanSize = sum(numProd),
+                            naupBioSize = sum(Carbon_mg_sum)) %>%
+                  full_join(y = naupTotBio, by = "year") %>% 
+                  mutate(naupPropBioSize = (naupBioSize/totBio)*(size-0.25)) %>%
+                  group_by(year) %>%
+                  summarize(totSize = sum(totSize),
+                            naupMeanSize = sum(naupMeanSize),
+                            naupPropBioSize = sum(naupPropBioSize)) %>%
+                  mutate(naupMeanSize = naupMeanSize/totSize)
+
+naupMeanSize %>% ggplot(aes(x = year, y = naupMeanSize)) +
+  geom_line() +
+  labs(y = "Mean nauplii size in spring (mm)")
 ```
 
 # Species distribution model outputs
@@ -455,7 +521,9 @@ zooplkn <- zooplkn %>% group_by(Class, year, seas) %>%
               pivot_wider(names_from = Class, values_from = meanZooplkn) %>%
               select(-seas)
 
-
+# zooplkn size spectra
+copMeanSize <- copMeanSize %>% select(-totSize)
+naupMeanSize <- naupMeanSize %>% select(-totSize)
 
 # Join SS output and change name of 'Yr' once
 outSS3 <- anchRec %>% full_join(sardRec, by = "Yr")  %>% 
@@ -465,6 +533,8 @@ outSS3 <- anchRec %>% full_join(sardRec, by = "Yr")  %>%
 recrDat <- recrDat %>% full_join(waa, by = "year") %>%
               full_join(waaFishery, by = "year") %>%
               full_join(zooplkn, by = "year") %>%
+              full_join(copMeanSize, by = "year") %>%
+              full_join(naupMeanSize, by = "year") %>%
               full_join(spawnTS, by = "year") %>%
               full_join(outSS3, by = "year") %>%
               full_join(anchBio, by = "year") %>%
