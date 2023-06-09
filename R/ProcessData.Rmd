@@ -30,11 +30,12 @@ datPath <- "C:/Users/r.wildermuth/Documents/FutureSeas/RecruitmentIndex/DFA_data
 # handle weights, habitat, and zooplankton separately
 datFiles <- list.files(datPath)
 datFiles <- datFiles[-which(datFiles %in% c("Anchovy_Sardine_len_wt_age.csv", 
-                                              "AtlantisModel_C_biomass_data_31Mar2021.csv",
-                                              "SDMoutput",
+                                            "AtlantisModel_C_biomass_data_31Mar2021.csv",
+                                            "SDMoutput",
                                             "anchovySSfiles",
                                             "SpringPRPOOSdata_Copepods_sizeFractions.csv",
-                                            "SpringPRPOOSdata_Nauplii_sizeFractions.csv"))]
+                                            "SpringPRPOOSdata_Nauplii_sizeFractions.csv",
+                                            "sswi_monthly_35-37N_1980-2010.csv"))]
 
 # df names
 datNames <- sub("_dl20230109.csv", "", datFiles)
@@ -78,6 +79,9 @@ recrDat <- lapply(mget(datNames),
                   function(x) {x %>% mutate(year = year(time),
                                             month = month(time)) %>%
                                   select(-time)})
+
+# Read in SSWI separately
+sswi <- read_csv(file.path(datPath, "sswi_monthly_35-37N_1980-2010.csv"))
 
 # ---- Aggregate monthly measures for annual time series ------
 # NPGO indicator of forage, aggregate May - July
@@ -134,10 +138,19 @@ recrDat$EI_SouthernCOP_44.6N <- recrDat$EI_SouthernCOP_44.6N %>% filter(month %i
                       pivot_wider(names_from = seas, names_prefix = "SCOP",
                                   values_from = SCOP)
 
+# Southern Source Water Index indicator of nursery habitat, aggregate Jan-Jun, Jul-Dec
+sswi <- sswi %>% mutate(seas = case_when(month %in% 1:6 ~ "spring",
+                                         month %in% 7:12 ~ "summer")) %>%
+          group_by(year, seas) %>%
+          summarize(avgSSWI = mean(sswi)) %>% 
+          pivot_wider(names_from = seas, names_prefix = "avgSSWI",
+                      values_from = avgSSWI)
+
 # collapses dfs into single wide table
 recrDat <- recrDat %>% reduce(full_join, by = "year") 
 recrDat <- recrDat %>% select(-starts_with("month", vars = names(recrDat))) %>%
               arrange(year)
+recrDat <- recrDat %>% full_join(y = sswi, by = "year")
 
 recrDat %>% pivot_longer(cols = c(-year), names_to = "Index", values_to = "vals") %>%
   filter(!is.na(vals), year >= 1950, year != 2020) %>%
