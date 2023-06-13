@@ -34,6 +34,22 @@ with(anchDat, table(year, dist_block, latBlock))
 # add column with response as binary
 anchDat$bin <- as.numeric(anchDat$cpue>0)
 
+# plot confirmed observations
+pac.coast <- borders("world", colour="gray50", fill="gray50", 
+                     xlim = c(-126, -116), ylim = c(29, 36))
+anchDat %>% 
+  filter(bin == 1) %>%
+  ggplot(aes(x = longitude, y = latitude)) +
+  geom_point(aes(size = cpue, col = dist_block, alpha = 0.1)) +
+  pac.coast +
+  coord_sf(xlim = c(-126, -116), ylim = c(29, 36)) +
+  labs(title = "Anchovy observations w/in Blocks") +
+  geom_segment(data = data.frame(x = -116, 
+                                 y = 31, 
+                                 xend = -124,
+                                 yend = 31),
+               mapping = aes(x = x, y = y, xend = xend, yend = yend))
+
 # get vector of years for plots (later)
 yr.vec <- unique(anchDat$year)
 

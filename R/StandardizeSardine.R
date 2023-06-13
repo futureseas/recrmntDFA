@@ -4,8 +4,10 @@
 
 library(tidyverse)
 library(rstanarm)
+library(mgcv)
 
 # CalCOFI larval data provided by Andrew Thompson 5/23/2023 for 66 regularly sampled core stations
+# data is scaled for proportion of sample sorted and unit is No./10m^2 (cylindrical)
 mydata <- read.csv("C:/Users/r.wildermuth/Documents/FutureSeas/RecruitmentIndex/DFA_data/CalCOFI_ichthioplankton_20230523.csv")
 
 sardDat <- mydata %>% 
@@ -24,8 +26,13 @@ sardDat$dist_block[sardDat$station >= 55 & sardDat$station < 70] <- "Block2"
 sardDat$dist_block[sardDat$station >= 70 & sardDat$station < 90] <- "Block3"
 sardDat$dist_block[sardDat$station >= 90] <- "Block4"
 
+pac.coast <- borders("world", colour="gray50", fill="gray50", 
+                     xlim = c(-126, -116), ylim = c(29, 36))
 sardDat %>% ggplot(aes(x = longitude, y = latitude, col = dist_block)) +
-  geom_point()
+  geom_point() +
+  labs(title = "Sample locations w/in Blocks") +
+  pac.coast +
+  coord_sf(xlim = c(-126, -116), ylim = c(29, 36)) 
 
 # see about latitude blocks
 sardDat <- sardDat %>%
@@ -36,6 +43,20 @@ with(sardDat, table(year, dist_block, latBlock))
 
 # add column with response as binary
 sardDat$bin <- as.numeric(sardDat$cpue>0)
+
+# plot confirmed observations
+sardDat %>% 
+  filter(bin == 1) %>%
+  ggplot(aes(x = longitude, y = latitude)) +
+  geom_point(aes(size = cpue, col = dist_block, alpha = 0.1)) +
+  pac.coast +
+  coord_sf(xlim = c(-126, -116), ylim = c(29, 36)) +
+  labs(title = "Sardine observations w/in Blocks") +
+  geom_segment(data = data.frame(x = c(-116, -117, -118, -120, -122, -124),
+                                 y = c(31, 33, 33, 33, 33, 33),
+                                 xend = c(-124, -124, -118, -120, -122, -124),
+                                 yend = c(31, 33, 31, 31, 31, 31)),
+               mapping = aes(x = x, y = y, xend = xend, yend = yend))
 
 # get vector of years for plots (later)
 yr.vec <- unique(sardDat$year)
@@ -51,6 +72,12 @@ with(sardDat, table(year,dist_block))
 
 # try removing intercept
 sardDat$int <- 1
+
+########## fit a Tweedie GAMM using mgcv
+# Set this up like Hunsicker et al. 2022 Appendix
+gamFit <- gam(cpue ~ year - 1 + s(latitude, longitude, by = year),
+              family = Tweedie(p = 1.25, link = "log"),
+              data = sardDat, method = "REML")
 
 ########## fit a binomial GLM using rstanarm
 # using default priors for example only... better to think more about this
