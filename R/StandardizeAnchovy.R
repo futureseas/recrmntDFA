@@ -229,3 +229,6 @@ ggplot(ss_data2, aes(year, scale(log(obs), scale = FALSE))) +
   geom_line(data = datDFA %>% filter(!is.na(sprCalCOFILarvalAnchovy)), 
             aes(x = year, y = scale(sprCalCOFILarvalAnchovy, scale = FALSE)),
             col = "darkblue")
+
+# write_csv(x = ss_data2 %>% select(year, obs, se_log, low, high),
+#           file = "C:/Users/r.wildermuth/Documents/FutureSeas/RecruitmentIndex/DFA_data/larvalAnchovyIndex.csv")

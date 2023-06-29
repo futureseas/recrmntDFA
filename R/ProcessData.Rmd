@@ -314,7 +314,7 @@ A proxy of area of spawning habitat is determined by compiling daily habitat est
 
 ```{r}
 # sardine and anchovy have different breeding seasons
-sardFiles <- expand.grid("sard", 3:7, 1998:2018, "GAM_noSSB.nc") %>% 
+sardFiles <- expand.grid("sard", 3:7, 1998:2022, "mboost_roms.nc") %>% 
                     mutate(sdmFile = paste(Var1, Var2, Var3, Var4, sep = "_")) %>%
                     pull(sdmFile)
 
@@ -343,11 +343,11 @@ sardSlice <- slice(sardSDMs, index = 1:5, along = "time")
 ggplot() + geom_stars(data = sardSlice) + facet_wrap(~time)
 
 # Calculate high probability habitat
-probMean <- mean(sardSDMs$sard_3_1998_GAM_noSSB.nc, na.rm = TRUE)
-probSD <- sd(sardSDMs$sard_3_1998_GAM_noSSB.nc, na.rm = TRUE)
+probMean <- mean(sardSDMs$sard_3_1998_mboost_roms.nc, na.rm = TRUE)
+probSD <- sd(sardSDMs$sard_3_1998_mboost_roms.nc, na.rm = TRUE)
 upper95 <- probMean + 1.96*probSD
 # discrimination threshold from Barb Muhling:
-sardHabThresh <- 0.42
+sardHabThresh <- 0.45
 
 # Try masking low probability cells
 sardSpawn <- sardSDMs
@@ -359,7 +359,7 @@ sardSpawnSlice <- slice(sardSpawn, index = 150:160, along = "time")
 #ggplot() + geom_stars(data = sardSpawnSlice) + facet_wrap(~time)
 
 # Map prep
-pac.coast <- borders("world", colour="gray50", fill="gray50", xlim = c(-140, -100), ylim = c(20, 60))
+pac.coast <- borders("world", colour="brown", fill="brown", xlim = c(-140, -100), ylim = c(20, 60))
 mycols <- colors()[c(473,562,71,610,655,653,621,34)]
 mypalette <- colorRampPalette(mycols)(255)
 
@@ -377,20 +377,21 @@ st_get_dimension_values(sardSpawnYr, "time")
 
 ggplot() +
   geom_stars(data = aperm(sardSpawnYr, c(2,3,1))) +
+  pac.coast +
+  geom_sf(data = ccAtl, color = "black", size = 1.5, fill = NA) +
   scale_fill_gradientn(colours = mypalette,
-                       limits = c(0, max(sardSpawnYr$sard_3_1998_GAM_noSSB.nc,
+                       limits = c(0, max(sardSpawnYr$sard_3_1998_mboost_roms.nc,
                                          na.rm = TRUE)),
                        na.value = NA) +
   guides(fill = guide_colorbar(barwidth=0.5, barheight=5)) +
-  pac.coast +
-  geom_sf(data = ccAtl, color = "black", size = 1.5, fill = NA) +
+  
   coord_sf(xlim = c(-130, -115), ylim = c(28, 42)) +
   facet_wrap(~time)
 
 sardSpawnHab <- aggregate(sardSpawnYr, ccAtl, FUN = sum, na.rm = TRUE)
 
 #--- Anchovy --------------------------
-anchFiles <- expand.grid("anch", 2:4, 1998:2018, "GAM_noSSB.nc") %>% 
+anchFiles <- expand.grid("anch", 2:4, 1998:2022, "mboost_roms.nc") %>% 
                     mutate(sdmFile = paste(Var1, Var2, Var3, Var4, sep = "_")) %>%
                     pull(sdmFile)
 
@@ -413,7 +414,7 @@ probMean <- mean(anchSDMs$anch_2_1998_GAM_noSSB.nc, na.rm = TRUE)
 probSD <- sd(anchSDMs$anch_2_1998_GAM_noSSB.nc, na.rm = TRUE)
 upper95 <- probMean + 1.96*probSD
 # discrimination threshold from Barb Muhling:
-anchHabThresh <- 0.30
+anchHabThresh <- 0.29
 
 # Try masking low probability cells
 anchSpawn <- anchSDMs
@@ -437,7 +438,7 @@ st_get_dimension_values(anchSpawnYr, "time")
 ggplot() +
   geom_stars(data = aperm(anchSpawnYr, c(2,3,1))) +
   scale_fill_gradientn(colours = mypalette,
-                       limits = c(0, max(anchSpawnYr$anch_2_1998_GAM_noSSB.nc,
+                       limits = c(0, max(anchSpawnYr$anch_2_1998_mboost_roms.nc,
                                          na.rm = TRUE)),
                        na.value = NA) +
   guides(fill = guide_colorbar(barwidth=0.5, barheight=5)) +
@@ -447,9 +448,9 @@ ggplot() +
   facet_wrap(~time)
 
 anchSpawnHab <- aggregate(anchSpawnYr, ccAtl, FUN = sum, na.rm = TRUE)
-spawnTS <- data.frame(year = 1998:2018,
-                      sardSpawnHab = t(sardSpawnHab$sard_3_1998_GAM_noSSB.nc),
-                      anchSpawnHab = t(anchSpawnHab$anch_2_1998_GAM_noSSB.nc))
+spawnTS <- data.frame(year = 1998:2022,
+                      sardSpawnHab = t(sardSpawnHab$sard_3_1998_mboost_roms.nc),
+                      anchSpawnHab = t(anchSpawnHab$anch_2_1998_mboost_roms.nc))
 
 spawnTS %>% pivot_longer(cols = c("sardSpawnHab", "anchSpawnHab")) %>%
   ggplot() +
@@ -460,6 +461,217 @@ spawnTS %>% pivot_longer(cols = c("sardSpawnHab", "anchSpawnHab")) %>%
 Two options for spawning timing:
 1. Hierarchical process of determining spawning area from yearly maps using rules for spawning area to create possible spawning area polygon, then indicating date at which some threshold of cells reach breeding habitat probability threshold within that area.
 2. Similar to 1), but using polygon derived from CalCOFI stations with high proportion of larval catches throughout the survey.
+```{r}
+# aggregate over time
+by_t <- as.POSIXct(c("0099-01-01", "0123-01-01"))
+sardSpawnGrounds <- aggregate(sardSpawnYr, by = by_t, FUN = sum, 
+                              na.rm = TRUE, rightmost.closed = TRUE)
+# Change to categorical (1 = in spawning grounds)
+sardSpawnGrounds[sardSpawnGrounds > 0] <- 1
+# rearrange the dimensions and get only the aggregated time slice
+sardSpawnGrounds <- aperm(sardSpawnGrounds, c(2,3,1))
+sardSpawnGrounds <- sardSpawnGrounds[, , , 1]
+
+ggplot() +
+  geom_stars(data = sardSpawnGrounds) +
+  pac.coast +
+  geom_sf(data = ccAtl, color = "black", size = 1.5, fill = NA) +
+  coord_sf(xlim = c(-130, -115), ylim = c(28, 42)) +
+  facet_wrap(~time)
+
+# Anchovy
+anchSpawnGrounds <- aggregate(anchSpawnYr, by = by_t, FUN = sum, 
+                              na.rm = TRUE, rightmost.closed = TRUE)
+# Change to categorical (1 = in spawning grounds)
+anchSpawnGrounds[anchSpawnGrounds > 0] <- 1
+# rearrange the dimensions and get only the aggregated time slice
+anchSpawnGrounds <- aperm(anchSpawnGrounds, c(2,3,1))
+anchSpawnGrounds <- anchSpawnGrounds[, , , 1]
+
+ggplot() +
+  geom_stars(data = anchSpawnGrounds) +
+  pac.coast +
+  geom_sf(data = ccAtl, color = "black", size = 1.5, fill = NA) +
+  coord_sf(xlim = c(-130, -115), ylim = c(28, 42)) +
+  facet_wrap(~time)
+```
+
+Find proportion of breeding habitat in spawning ground
+```{r}
+# convert spawning days to categorical
+sardSpawn1NA <- sardSpawn
+sardSpawn1NA[sardSpawn > sardHabThresh] <- 1 # should only be NAs and 1s
+
+# find number of cells in spawning grounds
+sardSpGrdDenom <- aggregate(sardSpawnGrounds, by = ccAtl, FUN = sum, na.rm = TRUE)
+sardSpGrdDenom <- as.numeric(sardSpGrdDenom$sard_3_1998_mboost_roms.nc)
+
+# find number of high probability cells at each time
+sardSpGrdNum <- aggregate(sardSpawn1NA, by = ccAtl, FUN = sum, na.rm = TRUE)
+sardSpGrdNum <- t(sardSpGrdNum$sard_3_1998_mboost_roms.nc) 
+
+summary(sardSpGrdNum/sardSpGrdDenom)
+plot(sardSpGrdNum/sardSpGrdDenom, type = "l")
+abline(h = quantile(sardSpGrdNum/sardSpGrdDenom, probs = c(0.1, 0.2, 0.5)))
+
+# convert spawning days to categorical
+anchSpawn1NA <- anchSpawn
+anchSpawn1NA[anchSpawn > anchHabThresh] <- 1 # should only be NAs and 1s
+
+# find number of cells in spawning grounds
+anchSpGrdDenom <- aggregate(anchSpawnGrounds, by = ccAtl, FUN = sum, na.rm = TRUE)
+anchSpGrdDenom <- as.numeric(anchSpGrdDenom$anch_2_1998_mboost_roms.nc)
+
+# find number of high probability cells at each time
+anchSpGrdNum <- aggregate(anchSpawn1NA, by = ccAtl, FUN = sum, na.rm = TRUE)
+anchSpGrdNum <- t(anchSpGrdNum$anch_2_1998_mboost_roms.nc) 
+
+summary(anchSpGrdNum/anchSpGrdDenom)
+plot(anchSpGrdNum/anchSpGrdDenom, type = "l")
+abline(h = quantile(anchSpGrdNum/anchSpGrdDenom, probs = c(0.2, 0.5)))
+```
+
+## Nursury habitat area
+```{r}
+# sardine and anchovy have different breeding seasons
+sardFiles <- expand.grid("sardLarvae", 3:7, 1998:2022, "mboost_roms.nc") %>% 
+                    mutate(sdmFile = paste(Var1, Var2, Var3, Var4, sep = "_")) %>%
+                    pull(sdmFile)
+
+sardFiles <- paste0(datPath, "SDMoutput/sardine_larvae/", sardFiles)
+sardLarvSDMs <- read_stars(sardFiles, proxy = FALSE, quiet = TRUE)
+st_crs(sardLarvSDMs) <- "+proj=longlat +ellps=WGS84 +datum=WGS84"
+sardLarvSDMs <- st_transform(sardLarvSDMs, "+proj=longlat +ellps=WGS84 +datum=WGS84")
+#st_get_dimension_values(sardLarvSDMs, "time")
+
+# Use CalCurrent Atlantis extent to limit sample frame
+ccAtl <- st_read("C:/Users/r.wildermuth/Documents/FutureSeas/MapFiles/emocc_whole_domain.shp")
+ccAtl <- st_transform(ccAtl, "+proj=longlat +ellps=WGS84 +datum=WGS84")
+
+# restrict to area south of 40deg N
+newAtlbbox <- st_bbox(ccAtl)
+newAtlbbox$ymax <- 40.0
+newAtlbbox <- st_bbox(unlist(newAtlbbox))
+ccAtl <- st_crop(ccAtl, newAtlbbox)
+
+# crop to Atlantis extent
+sardLarvSDMs <- st_crop(x = sardLarvSDMs,
+                      y = ccAtl)
+
+
+# Calculate high probability habitat
+probMean <- mean(sardLarvSDMs$sard_3_1998_mboost_roms.nc, na.rm = TRUE)
+probSD <- sd(sardLarvSDMs$sard_3_1998_mboost_roms.nc, na.rm = TRUE)
+upper95 <- probMean + 1.96*probSD
+# discrimination threshold from Barb Muhling:
+sardLarvHabThresh <- 0.17
+
+# Try masking low probability cells
+sardLarv <- sardLarvSDMs
+sardLarv[sardLarvSDMs < sardLarvHabThresh] <- NA
+# Don't allow spawning habitat above 40deg north
+#sardSpawn2 <- sardSpawn %>% filter(y < 40)
+
+#sardSpawnSlice <- slice(sardSpawn, index = 150:160, along = "time")
+#ggplot() + geom_stars(data = sardSpawnSlice) + facet_wrap(~time)
+
+# Map prep
+pac.coast <- borders("world", colour="brown", fill="brown", xlim = c(-140, -100), ylim = c(20, 60))
+mycols <- colors()[c(473,562,71,610,655,653,621,34)]
+mypalette <- colorRampPalette(mycols)(255)
+
+# ggplot() +
+#   geom_stars(data = sardSpawnSlice) +
+#   scale_fill_gradientn(colours = mypalette, limits = c(0, 0.8), na.value = NA) +
+#   guides(fill = guide_colorbar(barwidth=0.5, barheight=5)) +
+#   pac.coast + 
+#   geom_sf(data = ccAtl, color = "black", size = 1.5, fill = NA) +
+#   coord_sf(xlim = c(-130, -113), ylim = c(27, 42)) +
+#   facet_wrap(~time)
+
+sardLarvYr <- aggregate(sardLarv, by = "years", FUN = sum, na.rm = TRUE)
+st_get_dimension_values(sardLarvYr, "time")
+
+ggplot() +
+  geom_stars(data = aperm(sardLarvYr, c(2,3,1))) +
+  pac.coast +
+  geom_sf(data = ccAtl, color = "black", size = 1.5, fill = NA) +
+  scale_fill_gradientn(colours = mypalette,
+                       limits = c(0, max(sardLarvYr$sardLarvae_3_1998_mboost_roms.nc,
+                                         na.rm = TRUE)),
+                       na.value = NA) +
+  guides(fill = guide_colorbar(barwidth=0.5, barheight=5)) +
+  coord_sf(xlim = c(-130, -115), ylim = c(28, 42)) +
+  facet_wrap(~time)
+
+sardLarvHab <- aggregate(sardLarvYr, ccAtl, FUN = sum, na.rm = TRUE)
+
+#--- Anchovy --------------------------
+anchFiles <- expand.grid("anchLarvae", 2:4, 1998:2022, "mboost_roms.nc") %>% 
+                    mutate(sdmFile = paste(Var1, Var2, Var3, Var4, sep = "_")) %>%
+                    pull(sdmFile)
+
+anchFiles <- paste0(datPath, "SDMoutput/anchovy_larvae/", anchFiles)
+anchLarvSDMs <- read_stars(anchFiles, proxy = FALSE, quiet = TRUE)
+st_crs(anchLarvSDMs) <- "+proj=longlat +ellps=WGS84 +datum=WGS84"
+anchLarvSDMs <- st_transform(anchLarvSDMs, "+proj=longlat +ellps=WGS84 +datum=WGS84")
+#st_get_dimension_values(anchLarvSDMs, "time")
+
+# crop to Atlantis extent
+anchLarvSDMs <- st_crop(x = anchLarvSDMs,
+                      y = ccAtl)
+
+# show first 5 days of SDM
+anchLarvSlice <- slice(anchLarvSDMs, index = 1:5, along = "time")
+ggplot() + geom_stars(data = anchLarvSlice) + facet_wrap(~time)
+
+# Calculate high probability habitat
+probMean <- mean(anchLarvSDMs$anch_2_1998_GAM_noSSB.nc, na.rm = TRUE)
+probSD <- sd(anchLarvSDMs$anch_2_1998_GAM_noSSB.nc, na.rm = TRUE)
+upper95 <- probMean + 1.96*probSD
+# discrimination threshold from Barb Muhling:
+anchLarvHabThresh <- 0.42
+
+# Try masking low probability cells
+anchLarv <- anchLarvSDMs
+anchLarv[anchLarvSDMs < anchLarvHabThresh] <- NA
+
+# anchLarvSlice <- slice(anchLarv, index = 150:160, along = "time")
+# #ggplot() + geom_stars(data = sardLarvSlice) + facet_wrap(~time)
+# 
+# ggplot() +
+#   geom_stars(data = anchLarvSlice) +
+#   scale_fill_gradientn(colours = mypalette, limits = c(0, 0.8), na.value = NA) +
+#   guides(fill = guide_colorbar(barwidth=0.5, barheight=5)) +
+#   pac.coast + 
+#   geom_sf(data = ccAtl, color = "black", size = 1.5, fill = NA) +
+#   coord_sf(xlim = c(-130, -113), ylim = c(27, 42)) +
+#   facet_wrap(~time)
+
+anchLarvYr <- aggregate(anchLarv, by = "years", FUN = sum, na.rm = TRUE)
+st_get_dimension_values(anchLarvYr, "time")
+
+ggplot() +
+  geom_stars(data = aperm(anchLarvYr, c(2,3,1))) +
+  scale_fill_gradientn(colours = mypalette,
+                       limits = c(0, max(anchLarvYr$anchLarvae_2_1998_mboost_roms.nc,
+                                         na.rm = TRUE)),
+                       na.value = NA) +
+  guides(fill = guide_colorbar(barwidth=0.5, barheight=5)) +
+  pac.coast +
+  geom_sf(data = ccAtl, color = "black", size = 1.5, fill = NA) +
+  coord_sf(xlim = c(-130, -115), ylim = c(28, 42)) +
+  facet_wrap(~time)
+
+anchLarvHab <- aggregate(anchLarvYr, ccAtl, FUN = sum, na.rm = TRUE)
+nurseTS <- data.frame(year = 1998:2022,
+                      sardNurseHab = t(sardLarvHab$sardLarvae_3_1998_mboost_roms.nc),
+                      anchNurseHab = t(anchLarvHab$anchLarvae_2_1998_mboost_roms.nc))
+
+nurseTS %>% pivot_longer(cols = c("sardNurseHab", "anchNurseHab")) %>%
+  ggplot() +
+  geom_line(aes(x = year, y = value, col = name))
+```
 
 # Assessment biomass and recruitment
 Use Stock Synthesis-based estimates of biomass and recruitment as index variables

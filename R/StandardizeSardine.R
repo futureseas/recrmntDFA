@@ -75,9 +75,10 @@ sardDat$int <- 1
 
 ########## fit a Tweedie GAMM using mgcv
 # Set this up like Hunsicker et al. 2022 Appendix
-gamFit <- gam(cpue ~ year - 1 + s(latitude, longitude, by = year),
+gamFit <- gam(cpue ~ year + s(latitude, longitude, by = year),
               family = Tweedie(p = 1.25, link = "log"),
-              data = sardDat, method = "REML")
+              data = sardDat, method = "REML",
+              control = gam.control(nthreads = 3))
 
 ########## fit a binomial GLM using rstanarm
 # using default priors for example only... better to think more about this
