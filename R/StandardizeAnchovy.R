@@ -4,6 +4,7 @@
 
 library(tidyverse)
 library(rstanarm)
+library(mgcv)
 
 # CalCOFI larval data provided by Andrew Thompson 5/23/2023 for 66 regularly sampled core stations
 mydata <- read.csv("C:/Users/r.wildermuth/Documents/FutureSeas/RecruitmentIndex/DFA_data/CalCOFI_ichthioplankton_20230523.csv")
@@ -65,12 +66,24 @@ with(anchDat, table(year,dist_block))
 # try removing intercept
 anchDat$int <- 1
 
+########## fit a Tweedie GAMM using mgcv
+# Set this up like Hunsicker et al. 2022 Appendix
+gamFit <- gam(cpue ~ year + te(latitude, longitude, bs = "fs"),
+              family = Tweedie(p = 1.25, link = "log"),
+              data = anchDat, method = "REML",
+              control = gam.control(nthreads = 3))
+gam.check(gamFit)
+
+anchLarv <- gamFit
+# save(anchLarv,
+#      file = "C:/Users/r.wildermuth/Documents/FutureSeas/RecruitmentIndex/DFA_data/anchovyLarvalIndex.RData")
+
 ########## fit a binomial GLM using rstanarm
 # using default priors for example only... better to think more about this
-binfit <- stan_glm(bin ~ year + dist_block - 1,
+binfit <- stan_glm(bin ~ year + latitude + longitude - 1,
                    family = binomial,
                    data = anchDat,
-                   iter=4000,
+                   iter=6000,
                    cores = parallel::detectCores()-2,
                    thin = 3)
 
@@ -83,7 +96,7 @@ prior_summary(binfit)
 # launch_shinystan(binfit)
 
 # compare stan point estimates to glm()
-binfit.mle <- glm(bin ~ year + dist_block -1,
+binfit.mle <- glm(bin ~ year + latitude + longitude -1,
                   family=binomial,
                   data=anchDat)
 summary(binfit.mle)
@@ -112,10 +125,10 @@ plot(rev(yr.vec), apply(bin.yrs.prop, 2, mean), type='o', xlab='year', ylab='pro
 
 ########## fit the model for the conditional mean (given positive)
 # I'm using a gamma, but you can do whatever
-gamfit <- stan_glm(cpue ~ year + dist_block -1,
+gamfit <- stan_glm(cpue ~ year + latitude + longitude -1,
                    family = Gamma(link='log'), # gaussian(),
                    data = subset(anchDat, cpue>0),
-                   iter = 4000,
+                   iter = 7000,
                    cores = parallel::detectCores()-2,
                    thin = 3)
 
@@ -126,7 +139,7 @@ prior_summary(gamfit)
 # launch_shinystan(gamfit)
 
 # compare stan point estimates to glm()
-gamfit.mle <- glm(cpue ~ year + dist_block -1,
+gamfit.mle <- glm(cpue ~ year + latitude + longitude -1,
                   family = Gamma(link='log'),
                   data = subset(anchDat, cpue>0))
 
@@ -218,6 +231,11 @@ ggplot(indxAnom, aes(x = year, y = indx)) +
             aes(x = year, y = scale(sprCalCOFILarvalAnchovy, scale = FALSE)),
             col = "darkblue")
 
+# Pull GAM index
+indxGAM <- data.frame(year = rev(yr.vec),
+                      coefGAM = as.vector(coef(gamFit))[1:length(yr.vec)])
+indxGAM$index <- indxGAM$coefGAM
+indxGAM <- indxGAM %>% mutate(index = index + c(0, coefGAM[2:length(yr.vec)]))
 
 ggplot(ss_data2, aes(year, scale(log(obs), scale = FALSE))) +
   geom_line() +
@@ -228,7 +246,10 @@ ggplot(ss_data2, aes(year, scale(log(obs), scale = FALSE))) +
   theme(legend.position = "none") + 
   geom_line(data = datDFA %>% filter(!is.na(sprCalCOFILarvalAnchovy)), 
             aes(x = year, y = scale(sprCalCOFILarvalAnchovy, scale = FALSE)),
-            col = "darkblue")
+            col = "darkblue") +
+  geom_line(data = indxGAM, 
+            aes(x = year, y = scale(index, center = FALSE)),
+            col = "orangered")
 
 # write_csv(x = ss_data2 %>% select(year, obs, se_log, low, high),
 #           file = "C:/Users/r.wildermuth/Documents/FutureSeas/RecruitmentIndex/DFA_data/larvalAnchovyIndex.csv")
