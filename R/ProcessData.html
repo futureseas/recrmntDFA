@@ -638,6 +638,57 @@ WCRNT &lt;- read_csv(paste0(datPath, &quot;WCNRT_CalCOFI_monave_SST_201101_20221
                                   values_from = SSTwcra)</code></pre>
 <pre><code>## `summarise()` has grouped output by &#39;year&#39;. You can override using the
 ## `.groups` argument.</code></pre>
+<pre class="r"><code># Northward transport across 32N
+# Downloaded from Mike Jacox (8/18/2023)
+transportOffshore &lt;- read_ncdf(paste0(datPath, &quot;wcra31_monthly_northward_velocity_0-50m_124.0-120.0W_31.9-32.1N_1981-2010.nc&quot;))</code></pre>
+<pre><code>## no &#39;var&#39; specified, using year, month, time, v
+## Will return stars object with 360 cells.</code></pre>
+<pre><code>## Warning in .get_nc_projection(meta$attribute, rep_var, cv): No projection
+## information found in nc file.</code></pre>
+<pre class="r"><code>offshoreTrans &lt;- data.frame(year = transportOffshore$year,
+                            month = transportOffshore$month,
+                            offshTrans = transportOffshore$v)
+
+transport &lt;- offshoreTrans %&gt;% mutate(seas = case_when(month %in% 1:6 ~ &quot;spring&quot;,
+                                          month %in% 6:12 ~ &quot;summer&quot;),
+                         season = case_when(month %in% 3:5 ~ &quot;spring&quot;,
+                                          month %in% 6:8 ~ &quot;summer&quot;,
+                                          month %in% 9:11 ~ &quot;fall&quot;,
+                                          month %in% c(12,1,2) ~ &quot;winter&quot;)) %&gt;%
+                group_by(year, seas) %&gt;%
+                summarize(avgOffshTran = mean(offshTrans)) %&gt;% 
+                # ggplot(aes(x = year, y = avgOffshTran, color = season)) +
+                # geom_line()
+        
+                pivot_wider(names_from = seas, names_prefix = &quot;avgOffTrans&quot;,
+                            values_from = avgOffshTran)</code></pre>
+<pre><code>## `summarise()` has grouped output by &#39;year&#39;. You can override using the
+## `.groups` argument.</code></pre>
+<pre class="r"><code>transportNearshore &lt;- read_ncdf(paste0(datPath, &quot;wcra31_monthly_northward_velocity_0-50m_120.0-115.0W_31.9-32.1N_1981-2010.nc&quot;))</code></pre>
+<pre><code>## no &#39;var&#39; specified, using year, month, time, v
+## Will return stars object with 360 cells.</code></pre>
+<pre><code>## Warning in .get_nc_projection(meta$attribute, rep_var, cv): No projection
+## information found in nc file.</code></pre>
+<pre class="r"><code>nearshoreTrans &lt;- data.frame(year = transportNearshore$year,
+                            month = transportNearshore$month,
+                            nearshTrans = transportNearshore$v)
+
+transport &lt;- nearshoreTrans %&gt;% mutate(seas = case_when(month %in% 1:6 ~ &quot;spring&quot;,
+                                          month %in% 6:12 ~ &quot;summer&quot;),
+                         season = case_when(month %in% 3:5 ~ &quot;spring&quot;,
+                                          month %in% 6:8 ~ &quot;summer&quot;,
+                                          month %in% 9:11 ~ &quot;fall&quot;,
+                                          month %in% c(12,1,2) ~ &quot;winter&quot;)) %&gt;%
+                group_by(year, seas) %&gt;%
+                summarize(avgNearshTran = mean(nearshTrans)) %&gt;% 
+                # ggplot(aes(x = year, y = avgNearshTran, color = season)) +
+                # geom_line()
+        
+                pivot_wider(names_from = seas, names_prefix = &quot;avgNearTrans&quot;,
+                            values_from = avgNearshTran) %&gt;%
+                full_join(y = transport, by = &quot;year&quot;)</code></pre>
+<pre><code>## `summarise()` has grouped output by &#39;year&#39;. You can override using the
+## `.groups` argument.</code></pre>
 </div>
 <div id="larval-indices" class="section level1">
 <h1>Larval indices</h1>
@@ -672,6 +723,18 @@ indxGAM %&gt;% select(year, sardLarv, anchLarv, mesopelLarv) %&gt;%
 </div>
 <div id="young-of-the-year-index" class="section level1">
 <h1>Young-of-the-Year Index</h1>
+<p>John Field’s standardized young-of-the-year anchovy index from the
+RREAS survey, pulled from Charlie Hinchliffe’s anchovy model by Desiree
+Tommasi (8/23/2023).</p>
+<pre class="r"><code>yoyAnch &lt;- read_csv(file = paste0(datPath, &quot;RREAS_anchovy_YOY_index.csv&quot;), na = &quot;NULL&quot;)</code></pre>
+<pre><code>## Rows: 16 Columns: 3
+## ── Column specification ────────────────────────────────────────────────────────
+## Delimiter: &quot;,&quot;
+## dbl (3): Year, Index, se_log
+## 
+## ℹ Use `spec()` to retrieve the full column specification for this data.
+## ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.</code></pre>
+<pre class="r"><code>yoyAnch &lt;- yoyAnch %&gt;% rename(anchYoY = Index)</code></pre>
 </div>
 <div id="weight-at-age-data" class="section level1">
 <h1>Weight-at-age data</h1>
@@ -2396,6 +2459,7 @@ sst &lt;- WCRNT %&gt;% rename(springSST = SSTwcnrtspring,
 <pre><code>## Joining with `by = join_by(year, springSST, summerSST)`</code></pre>
 <pre class="r"><code># Combine everything together and save
 recrDat &lt;- recrDat %&gt;% full_join(indxGAM, by = &quot;year&quot;) %&gt;%
+              full_join(yoyAnch, by = c(&quot;year&quot; = &quot;Year&quot;)) %&gt;%
               full_join(waa, by = &quot;year&quot;) %&gt;%
               full_join(waaFishery, by = &quot;year&quot;) %&gt;%
               #full_join(zooplkn, by = &quot;year&quot;) %&gt;%
@@ -2411,13 +2475,14 @@ recrDat &lt;- recrDat %&gt;% full_join(indxGAM, by = &quot;year&quot;) %&gt;%
               full_join(anchBio, by = &quot;year&quot;) %&gt;%
               full_join(sardBio, by = &quot;year&quot;) %&gt;%
               full_join(sst, by = &quot;year&quot;) %&gt;%
+              full_join(transport, by = &quot;year&quot;) %&gt;%
               full_join(albacore, by = c(&quot;year&quot; = &quot;Years&quot;)) %&gt;%
               full_join(hake, by = c(&quot;year&quot; = &quot;Year&quot;)) %&gt;%
               select(-c(sprCalCOFILarvalAnchovy,
                         sprCalCOFILarvalSardine,
                         sprCalCOFISouthernMesopels,
                         sardGAMcoef, anchGAMcoef, mesopelGAMcoef,
-                        copGAMcoef, naupGAMcoef, GCM,
+                        copGAMcoef, naupGAMcoef, GCM, se_log,
                         PS_NorCal, PS_SoCal, PL_NorCal, PL_SoCal,
                         ZS_NorCal, ZS_SoCal, `Catches (T)`))
 

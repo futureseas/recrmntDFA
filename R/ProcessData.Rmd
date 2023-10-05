@@ -189,6 +189,49 @@ WCRA <- WCRA %>% mutate(seas = case_when(month %in% 1:6 ~ "spring",
                       summarize(SSTwcra = mean(sst_wcra31)) %>% 
                       pivot_wider(names_from = seas, names_prefix = "SSTwcra",
                                   values_from = SSTwcra)
+
+# Northward transport across 32N
+# Downloaded from Mike Jacox (8/18/2023)
+transportOffshore <- read_ncdf(paste0(datPath, "wcra31_monthly_northward_velocity_0-50m_124.0-120.0W_31.9-32.1N_1981-2010.nc"))
+
+offshoreTrans <- data.frame(year = transportOffshore$year,
+                            month = transportOffshore$month,
+                            offshTrans = transportOffshore$v)
+
+transport <- offshoreTrans %>% mutate(seas = case_when(month %in% 1:6 ~ "spring",
+                                          month %in% 6:12 ~ "summer"),
+                         season = case_when(month %in% 3:5 ~ "spring",
+                                          month %in% 6:8 ~ "summer",
+                                          month %in% 9:11 ~ "fall",
+                                          month %in% c(12,1,2) ~ "winter")) %>%
+                group_by(year, seas) %>%
+                summarize(avgOffshTran = mean(offshTrans)) %>% 
+                # ggplot(aes(x = year, y = avgOffshTran, color = season)) +
+                # geom_line()
+        
+                pivot_wider(names_from = seas, names_prefix = "avgOffTrans",
+                            values_from = avgOffshTran)
+
+transportNearshore <- read_ncdf(paste0(datPath, "wcra31_monthly_northward_velocity_0-50m_120.0-115.0W_31.9-32.1N_1981-2010.nc"))
+
+nearshoreTrans <- data.frame(year = transportNearshore$year,
+                            month = transportNearshore$month,
+                            nearshTrans = transportNearshore$v)
+
+transport <- nearshoreTrans %>% mutate(seas = case_when(month %in% 1:6 ~ "spring",
+                                          month %in% 6:12 ~ "summer"),
+                         season = case_when(month %in% 3:5 ~ "spring",
+                                          month %in% 6:8 ~ "summer",
+                                          month %in% 9:11 ~ "fall",
+                                          month %in% c(12,1,2) ~ "winter")) %>%
+                group_by(year, seas) %>%
+                summarize(avgNearshTran = mean(nearshTrans)) %>% 
+                # ggplot(aes(x = year, y = avgNearshTran, color = season)) +
+                # geom_line()
+        
+                pivot_wider(names_from = seas, names_prefix = "avgNearTrans",
+                            values_from = avgNearshTran) %>%
+                full_join(y = transport, by = "year")
 ```
 
 # Larval indices
@@ -223,9 +266,10 @@ indxGAM %>% select(year, sardLarv, anchLarv, mesopelLarv) %>%
 ```
 
 # Young-of-the-Year Index
+John Field's standardized young-of-the-year anchovy index from the RREAS survey, pulled from Charlie Hinchliffe's anchovy model by Desiree Tommasi (8/23/2023).
 ```{r}
-
-
+yoyAnch <- read_csv(file = paste0(datPath, "RREAS_anchovy_YOY_index.csv"), na = "NULL")
+yoyAnch <- yoyAnch %>% rename(anchYoY = Index)
 ```
 
 # Weight-at-age data
@@ -1007,6 +1051,7 @@ sst <- WCRNT %>% rename(springSST = SSTwcnrtspring,
 
 # Combine everything together and save
 recrDat <- recrDat %>% full_join(indxGAM, by = "year") %>%
+              full_join(yoyAnch, by = c("year" = "Year")) %>%
               full_join(waa, by = "year") %>%
               full_join(waaFishery, by = "year") %>%
               #full_join(zooplkn, by = "year") %>%
@@ -1022,13 +1067,14 @@ recrDat <- recrDat %>% full_join(indxGAM, by = "year") %>%
               full_join(anchBio, by = "year") %>%
               full_join(sardBio, by = "year") %>%
               full_join(sst, by = "year") %>%
+              full_join(transport, by = "year") %>%
               full_join(albacore, by = c("year" = "Years")) %>%
               full_join(hake, by = c("year" = "Year")) %>%
               select(-c(sprCalCOFILarvalAnchovy,
                         sprCalCOFILarvalSardine,
                         sprCalCOFISouthernMesopels,
                         sardGAMcoef, anchGAMcoef, mesopelGAMcoef,
-                        copGAMcoef, naupGAMcoef, GCM,
+                        copGAMcoef, naupGAMcoef, GCM, se_log,
                         PS_NorCal, PS_SoCal, PL_NorCal, PL_SoCal,
                         ZS_NorCal, ZS_SoCal, `Catches (T)`))
 
