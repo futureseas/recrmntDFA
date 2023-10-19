@@ -5,7 +5,7 @@ chains <- 3
 iter <- 10
 
 simDat20 <- sim_dfa(
-              num_trends = 2,
+              num_trends = 1,
               num_years = 15,
               num_ts = 20
             )
@@ -17,7 +17,7 @@ fit1trend <- fit_dfa(
   iter = iter, chains = chains, thin = 1)
 
 simDat35 <- sim_dfa(
-  num_trends = 2,
+  num_trends = 1,
   num_years = 15,
   num_ts = 35
 )
@@ -29,8 +29,8 @@ fit1trend <- fit_dfa(
   iter = iter, chains = chains, thin = 1)
 
 simDat40 <- sim_dfa(
-  num_trends = 2,
-  num_years = 10000, # initialization eventually worked with this sample size (num_years = 10000)
+  num_trends = 1,
+  num_years = 40, # initialization eventually worked with this sample size (num_years = 10000)
   num_ts = 40
 )
 dim(simDat40$y_sim)
@@ -41,7 +41,7 @@ fit1trend <- fit_dfa(
   iter = iter, chains = chains, thin = 1)
 
 simDat41 <- sim_dfa(
-  num_trends = 2,
+  num_trends = 1,
   num_years = 100,
   num_ts = 41
 )
@@ -53,8 +53,8 @@ fit1trend <- fit_dfa(
   iter = iter, chains = chains, thin = 1)
 
 simDat50 <- sim_dfa(
-  num_trends = 2,
-  num_years = 1000,
+  num_trends = 1,
+  num_years = 100,
   num_ts = 50
 )
 dim(simDat50$y_sim)

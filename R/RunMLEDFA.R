@@ -291,7 +291,7 @@ for (i in 1:dim(ts.trends)[2]) {
 
 
 # subset for anchovy DFA from 1990 to 2019
-allDat <- datDFA %>% filter(year %in% 1990:2019) %>%
+allDat <- datDFA %>% filter(year %in% 1980:2019) %>%
             # remove contemporary adult biomass with recruits, should be S2 biomass -> S1 recs
             select(-c(NOI,
                       ENSO,
@@ -300,8 +300,8 @@ allDat <- datDFA %>% filter(year %in% 1990:2019) %>%
                       #euphausiids, # too large for larval mouth gape
                       anchBioSmrySeas1,
                       sardBioSmrySeas1,
-                      # anchBioSmrySeas2, # leave out biomass since not fit well
-                      # sardBioSmrySeas2,
+                      anchBioSmrySeas2, # leave out biomass since not fit well
+                      sardBioSmrySeas2,
                       # NCOPspring,
                       # SCOPspring, # summer copepod index had higher loadings
                       PDOsummer, # lower loading than spring, may want to try a lag
@@ -343,8 +343,8 @@ diag(Rcustom) <- c("HCI",
                    "SDM", "SDM", "TIME", "TIME", "SDM", "SDM",
                    "anchRec", 
                    "sardRec",
-                   "anchBio",
-                   "sardBio",
+                   # "anchBio",
+                   # "sardBio",
                    "SST", "SST",
                    "Transp", "Transp", "Transp", "Transp",
                    "Alb", "Hake")
@@ -362,7 +362,7 @@ overallDFA <- MARSS(y = allDat,
                                # R = "equalvarcov", # observation errors equal and covars equal
                                # R = "unconstrained", # all observation errors independent
                                R = Rcustom,
-                               m = 4) # number of latent processes
+                               m = 3) # number of latent processes
 )
 
 # Look at factor loadings
@@ -396,9 +396,12 @@ df <- data.frame(est = as.vector(Z.rot),
 # new df with coordinates
 loadingsDF <- data.frame(index = datNames,
                          trend1 = Z.rot[, 1],
-                         trend2 = Z.rot[, 2], 
+                         trend2 = Z.rot[, 2],
+                         trend3 = Z.rot[, 3],
+                         trend4 = Z.rot[, 4],
                          dummy0 = 0) %>%
-                pivot_longer(cols = c(trend1, trend2), names_to = "Trend")
+                pivot_longer(cols = c(trend1, trend2, trend3, trend4), 
+                             names_to = "Trend")
 
 loadingsDF %>% ggplot(aes(y = index)) +
   geom_segment(aes(x = dummy0,
@@ -489,7 +492,7 @@ d %>% filter(name=="model",
              # .rownames %in% c("NPGO", "anchSpawnHab",
              #                  "SCOPsummer", "sprCalCOFISouthernMesopels",
              #                  "anchRec", "sprCalCOFILarvalAnchovy")) %>%
-             .rownames %in% c("sardRec", "anchRec")) %>%#, "sardLarv", "anchLarv")) %>%
+             .rownames %in% c("sardRec", "anchRec", "sardLarv", "anchLarv")) %>%
   mutate(t = t+1979) %>%
   full_join(y = ts.trends, by = "t") %>%
   ggplot(aes(x = t)) + 
@@ -518,9 +521,9 @@ loadingsDF <- loadingsDF %>% mutate(index = factor(index,
                                                              "sardLarv", "anchLarv",
                                                       varArrang)))
 
-myCols <- c("#FFB000", "#00BA38", "#F8766D", "#619CFF", "black")
-names(myCols) <- levels(c("Preconditioning", "Temperature",
-                          "Foraging", "Predation", "Interest Var"))
+myCols <- c("#F8766D", "black","#FFB000",   "#619CFF", "#00BA38")
+names(myCols) <- levels(c("Foraging", "Interest Var", "Preconditioning",  "Predation","Temperature"
+                          ))
 
 test1 <- loadingsDF %>% pivot_longer(cols = grep("vals.", names(loadingsDF), value = TRUE),
                             names_to = "trend",
@@ -546,8 +549,8 @@ test1 <- loadingsDF %>% pivot_longer(cols = grep("vals.", names(loadingsDF), val
                                           "avgOffTransspring", "avgOffTranssummer") ~ "Foraging",#"#F8766D",
                              index %in% c("albacore", "hake") ~ "Predation",#"#619CFF",
                              TRUE ~ "Interest Var" ),
-         colCode = as.factor(colCode)) %>% #"black")) %>%
-  filter(abs(vals) > 0.1) 
+         colCode = as.factor(colCode)) #%>% #"black")) %>%
+  #filter(abs(vals) > 0.1) 
 test1 %>%
   ggplot(aes(y = index, color = colCode)) +
   geom_segment(aes(x = dummy0,
@@ -562,5 +565,8 @@ test1 %>%
   geom_vline(xintercept = 0, color = "grey") +
   geom_hline(yintercept = 4.5, color = "black") +
   theme_classic() +
-  facet_wrap(~trend) #+
+  facet_wrap(~trend, nrow = 1) #+
   # theme(legend.position = "none")
+
+loadingsDF %>% filter(index %in% c("sardRec", "anchRec", 
+                                   "sardLarv", "anchLarv"))
