@@ -3,6 +3,7 @@
 
 library(tidyverse)
 library(bayesdfa)
+library(rstan)
 
 datDFA <- read_csv("recrDFAdat.csv")
 
@@ -54,6 +55,13 @@ datDense %>% group_by(year) %>%
 # overall proportion of missing data
 sum(is.na(allDat))/(dim(allDat)[1]*dim(allDat)[2])
 
+# long format data_shape
+longDat <- allDat %>% #select(year, HCI, OC_LUSI_33N, ZM_SoCal) %>%
+              pivot_longer(cols = -year, names_to = "VoI", values_to = "obs") %>%
+              rename(time = year) %>%
+              mutate(ts = as.numeric(factor(VoI, levels = datNames)),
+                     time = time- 1979)
+
 # transpose for MARSS formatting
 allDat <- allDat %>% select(-year) %>% t()
 
@@ -86,32 +94,105 @@ Rcustom <- c(1, #"HCI",
              19, #"Alb",
              20) #"Hake"
 
-fit4trends <- fit_dfa(
-                y = allDat, num_trends = 1, scale="zscore",
-                varIndx = rep(1, nrow(allDat)), #rep_len(1:2, nrow(allDat)),
+fit1trend <- fit_dfa(
+                y = longDat[, c("obs", "ts", "time")], # allDat,#
+                num_trends = 1, scale="zscore",
+                # varIndx = rep(1, nrow(allDat)), #rep_len(1:2, nrow(allDat)),
                 # varIndx = 1:nrow(allDat), # mapping of unique R matrix variances to indicators
-                # varIndx = Rcustom,
+                varIndx = Rcustom,
+                est_correlation = FALSE,
                 estimate_trend_ar = TRUE,
-                iter = iter, chains = chains, thin = 1,
+                data_shape = "long",
+                iter = iter, chains = chains, thin = 3,
+                cores = parallel::detectCores()-2)
+
+fit2trends <- fit_dfa(
+                y = longDat, #allDat, 
+                num_trends = 2, scale="zscore",
+                # varIndx = rep(1, nrow(allDat)), #rep_len(1:2, nrow(allDat)),
+                # varIndx = 1:nrow(allDat), # mapping of unique R matrix variances to indicators
+                varIndx = Rcustom,
+                est_correlation = FALSE,
+                estimate_trend_ar = TRUE,
+                data_shape = "long",
+                iter = iter, chains = chains, thin = 3,
                 cores = parallel::detectCores()-2)
 # RW: will not fit models with more than ~40 index time series
+# save(fit2trends, file = "bayesFit_1980to2019_noBio_strend_Rcustom.RData")
 
+
+fit3trends <- fit_dfa(
+  y = allDat, num_trends = 3, scale="zscore",
+  # varIndx = rep(1, nrow(allDat)), #rep_len(1:2, nrow(allDat)),
+  # varIndx = 1:nrow(allDat), # mapping of unique R matrix variances to indicators
+  varIndx = Rcustom,
+  est_correlation = FALSE,
+  estimate_trend_ar = TRUE,
+  iter = iter, chains = chains, thin = 1,
+  cores = parallel::detectCores()-2)
+
+fit4trends <- fit_dfa(
+  y = allDat, num_trends = 4, scale="zscore",
+  # varIndx = rep(1, nrow(allDat)), #rep_len(1:2, nrow(allDat)),
+  # varIndx = 1:nrow(allDat), # mapping of unique R matrix variances to indicators
+  varIndx = Rcustom,
+  est_correlation = TRUE,
+  estimate_trend_ar = FALSE,
+  iter = iter, chains = chains, thin = 1,
+  cores = parallel::detectCores()-2)
 
 # check convergence 
-is_converged(fit4trends)
+is_converged(fit2trends)
 
 # need convergence diagnostics
 # thinning?
-shinystan::launch_shinystan(fit4trends$model)
+shinystan::launch_shinystan(fit1trend$model)
+shinystan::launch_shinystan(fit2trends$model)
+shinystan::launch_shinystan(fit3trends$model)
+# For now just look at monitor to evaluate convergence
+npars <- dim(fit1trend$monitor)[1]
+fit1trend$monitor[(npars-25):npars,1:22]
+fit2trends$monitor[(npars-25):npars,1:22]
+fit3trends$monitor[(npars-25):npars,1:22]
+traceplot(fit1trend$model, pars = "xstar") + facet_wrap(~chain)
+traceplot(fit2trends$model, pars = "phi") 
+traceplot(fit3trends$model, pars = "xstar") 
+stan_ac(fit1trend$model, pars = "Z")
+stan_ac(fit2trends$model, pars = "Z")
+stan_ac(fit3trends$model, pars = "sigma")
+
+fit1trend$monitor %>% filter(Rhat > 1.05)
+
+fit2trends$monitor %>% filter(Rhat > 1.05)
+fit3trends$monitor %>% filter(Rhat > 1.05) %>% as.data.frame %>% select(mean, n_eff, Rhat)
+fit3trends$monitor %>% filter(n_eff < 100) %>% as.data.frame %>% select(mean, n_eff, Rhat)
+
+# see how chain flipping works
+# flipped_chains = bayesdfa::invert_chains(fit1trends$model, trends = 1)
+# head(fit4trends$model@sim$samples[[3]]$`x[1,1]`)
+# head(flipped_chains$model@sim$samples[[3]]$`x[1,1]`)
 
 # Rotate trends
-trendsRot <- rotate_trends(fit4trends)
+trendsRot <- rotate_trends(fit2trends)
 
-plot_trends(trendsRot)
+plot_trends(trendsRot) + geom_hline(yintercept = 0)
 
 # plot the fitted values
-plot_fitted(fit4trends)
+plot_fitted(fit2trends,
+            names = datNames)
+dfa_fitted(fit2trends, names = datNames) %>% filter(ID %in% c("sardRec", "sardLarv",
+                                                              "anchRec", "anchLarv",
+                                                              "anchYoY"))
 
 # plot the loadings
-plot_loadings(trendsRot) + 
-  theme_classic() + coord_flip()
+plot_loadings(trendsRot, names = datNames
+              ,threshold = 0.95 # 95% of posterior density is +/- 0
+              ) + 
+  theme_classic() 
+dfa_loadings(trendsRot, names = datNames) %>% filter(#trend == "Trend 2",
+                                                     name %in% c("sardRec", "sardLarv",
+                                                                 "anchRec", "anchLarv",
+                                                                 "anchYoY"))#,
+                                                     prob_diff0 > 0.5)
+
+dfa_trends(trendsRot)

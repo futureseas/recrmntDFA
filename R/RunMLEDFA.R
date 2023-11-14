@@ -290,7 +290,7 @@ for (i in 1:dim(ts.trends)[2]) {
 # All together -----------------------------------------------------------
 
 
-# subset for anchovy DFA from 1990 to 2019
+# subset from 1980 to 2019
 allDat <- datDFA %>% filter(year %in% 1980:2019) %>%
             # remove contemporary adult biomass with recruits, should be S2 biomass -> S1 recs
             select(-c(NOI,
@@ -362,8 +362,11 @@ overallDFA <- MARSS(y = allDat,
                                # R = "equalvarcov", # observation errors equal and covars equal
                                # R = "unconstrained", # all observation errors independent
                                R = Rcustom,
-                               m = 3) # number of latent processes
+                               m = 4) # number of latent processes
 )
+
+# save(overallDFA, file = "marssFit_1980to2019_noBio_3trend_Rcustom.RData")
+# save(overallDFA, file = "marssFit_1980to2019_noBio_4trend_Rcustom.RData")
 
 # Look at factor loadings
 # get the inverse of the rotation matrix 

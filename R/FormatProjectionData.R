@@ -16,8 +16,8 @@ datPath <- "C:/Users/r.wildermuth/Documents/FutureSeas/RecruitmentIndex/DFA_data
 # WCRA: includes ROMS reanalysis from 1980-2010"
 sstProj <- read_csv(paste0(datPath, "ROMS-ESMS_CalCOFI_monave_SST_198001-210012.csv"))
 
-sstProj <- sstProj %>% mutate(seas = case_when(month %in% 1:6 ~ "spring",
-                                               month %in% 7:12 ~ "summer")) %>%
+sstProj <- sstProj %>% mutate(seas = case_when(month %in% 1:6 ~ "springSST",
+                                               month %in% 7:12 ~ "summerSST")) %>%
   group_by(year, seas) %>%
   summarize(sstGFDL = mean(sst_roms_gfdl),
             sstIPSL = mean(sst_roms_ipsl),
@@ -31,6 +31,8 @@ sstProj %>% ggplot(aes(x = year, y = SST, color = ESM)) +
   geom_line() +
   facet_wrap(~seas, ncol = 1)+
   theme_classic()
+
+sstProj <- sstProj %>% pivot_wider(names_from = seas, values_from = SST)
 
 # Northward transport across 32N
 # Downloaded from Mike Jacox (8/18/2023)
@@ -101,5 +103,71 @@ nemuroZ %>% filter(GCM != "HIST") %>%
               theme_classic()
 
 nemuroZ <- nemuroZ %>% filter(GCM != "HIST") %>%           
-              pivot_wider(names_from = zone, values_from = c(PS, PL, ZS, ZM, ZL))
+              pivot_wider(names_from = zone, values_from = c(PS, PL, ZS, ZM, ZL)) %>%
+              rename(ESM = GCM)
 
+# Join together and calculate zscores based on mean and sd of training dataset
+projDat <- sstProj %>% #full_join(y= transport, by = c("year", "ESM")) %>%
+              full_join(y= nemuroZ, by = c("year", "ESM"))
+
+# read training dataset
+datDFA <- read_csv("C:/Users/r.wildermuth/Documents/FutureSeas/RecruitmentIndex/recrmntDFA/recrDFAdat.csv")
+
+# select only projectable variables 
+allDat <- datDFA %>% filter(year %in% 1980:2019) %>%
+            select(year, springSST, summerSST, avgNearTransspring, avgNearTranssummer,
+                   avgOffTransspring, avgOffTranssummer, ZM_NorCal, ZM_SoCal)
+
+# check mean and sd in historical period are same
+allDat %>% pivot_longer(-year, names_to = "var", values_to = "vals") %>%
+  group_by(var) %>%
+  summarize(histMean = mean(vals, na.rm = TRUE),
+            histSD = sd(vals, na.rm = TRUE))
+projHistSmry <- projDat %>% pivot_longer(-c(year, ESM), names_to = "var", values_to = "vals") %>%
+                  filter(year < 2020,
+                         var %in% c("springSST", "summerSST", "avgNearTransspring", 
+                                    "avgNearTranssummer", "avgOffTransspring", 
+                                    "avgOffTranssummer", "ZM_NorCal", "ZM_SoCal")) %>%
+                  group_by(var, ESM) %>%
+                  summarize(histMean = mean(vals, na.rm = TRUE),
+                            histSD = sd(vals, na.rm = TRUE))
+## RW!: mean and SD are pretty close but not spot on. Which should be used for zscoring?
+##      Do we need to bias correct?
+
+# For now, zscore using mean of historical period from projection set
+projDat <- projDat %>% pivot_longer(-c(year, ESM), names_to = "var", values_to = "vals") %>%
+  filter(var %in% c("springSST", "summerSST", "avgNearTransspring", 
+                    "avgNearTranssummer", "avgOffTransspring", 
+                    "avgOffTranssummer", "ZM_NorCal", "ZM_SoCal")) %>%
+  full_join(y = projHistSmry, by = c("var", "ESM")) %>%
+  mutate(scaled = (vals - histMean)/histSD) %>% 
+  select(year, ESM, var, scaled) %>%
+  pivot_wider(names_from = var, values_from = scaled)
+
+# add other empty variables
+projDat[c("HCI", "NCOPspring", "NCOPsummer", "SCOPspring", "SCOPsummer", 
+          "BEUTI_33N", "BEUTI_39N", "CUTI_33N", "CUTI_39N", "OC_LUSI_33N", 
+          "OC_LUSI_36N", "OC_LUSI_39N", "OC_STI_33N", "OC_STI_36N", "OC_STI_39N", 
+          "swfscRockfishSurv_Myctophids", "avgSSWIspring", "avgSSWIsummer", 
+          "sardLarv", "anchLarv", "mesopelLarv", "anchYoY", "age1SprSardmeanWAA", 
+          "meanSSBwt", "copBio", "naupBio", "sardSpawnHab", "anchSpawnHab", 
+          "daysAbove5pct", "daysAbove40pct", "sardNurseHab", "anchNurseHab", 
+          "anchRec", "sardRec", "avgNearTransspring", "avgNearTranssummer", 
+          "avgOffTransspring", "avgOffTranssummer", "albacore", "hake")] <- NA
+
+# select variables in same order as provided to model
+projDat <- projDat %>% filter(year >= 2020) %>% 
+  select(year, ESM, "HCI", "NCOPspring", "NCOPsummer", "SCOPspring",
+         "SCOPsummer", "BEUTI_33N", "BEUTI_39N", "CUTI_33N", "CUTI_39N",
+         "OC_LUSI_33N", "OC_LUSI_36N", "OC_LUSI_39N", "OC_STI_33N", 
+         "OC_STI_36N", "OC_STI_39N", "swfscRockfishSurv_Myctophids",
+         "avgSSWIspring", "avgSSWIsummer", "sardLarv", "anchLarv",
+         "mesopelLarv", "anchYoY", "age1SprSardmeanWAA", "meanSSBwt",
+         "copBio", "naupBio", "ZM_NorCal", "ZM_SoCal", "sardSpawnHab",
+         "anchSpawnHab", "daysAbove5pct", "daysAbove40pct", 
+         "sardNurseHab", "anchNurseHab", "anchRec", "sardRec", 
+         "springSST", "summerSST", "avgNearTransspring", 
+         "avgNearTranssummer", "avgOffTransspring", "avgOffTranssummer",
+         "albacore", "hake")
+
+# write_csv(projDat, file = "C:/Users/r.wildermuth/Documents/FutureSeas/RecruitmentIndex/DFA_data/formattedDFAprojDat.csv")
