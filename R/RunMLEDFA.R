@@ -478,6 +478,168 @@ for (i in 1:dim(ts.trends)[2]) {
   axis(1,  (0:dim(allDat)[2]) , 1980 + 0:dim(allDat)[2])
 } # end i loop (trends)
 
+# Projection Model -----------------------------------------------------------
+
+# subset from 1980 to 2019
+projDat <- datDFA %>% filter(year %in% 1980:2019) %>%
+  # select only projectable vars and vars of interest
+  select("year", "BEUTI_33N", "BEUTI_39N", "CUTI_33N", "CUTI_39N", "OC_LUSI_33N",
+         "OC_LUSI_36N", "OC_LUSI_39N", "OC_STI_33N", "OC_STI_36N", "OC_STI_39N",
+         "avgSSWIspring", "avgSSWIsummer", "sardLarv", "anchLarv", "anchYoY",
+         "ZM_NorCal", "ZM_SoCal", "sardSpawnHab", "anchSpawnHab", "daysAbove5pct",
+         "daysAbove40pct", "sardNurseHab", "anchNurseHab", "anchRec", "sardRec",
+         "springSST", "summerSST", "avgNearTransspring", "avgNearTranssummer",
+         "avgOffTransspring", "avgOffTranssummer") 
+
+datNames <- names(projDat)[-1]
+
+# transpose for MARSS formatting
+projDat <- projDat %>% select(-year) %>% t()
+
+# Create a custom R obs error matrix assuming each data source has it's own common error
+RcustProj <- matrix(list(0),length(datNames),length(datNames)) 
+diag(RcustProj) <- c("BEUTI", "BEUTI", 
+                     "CUTI", "CUTI",
+                     "LUSI", "LUSI", "LUSI", 
+                     "STI", "STI", "STI",
+                     "SSWI", "SSWI",
+                     "CalCOFI", "CalCOFI",
+                     "RREAS",
+                     "NEMURO", "NEMURO",
+                     "SDM", "SDM", "TIME", "TIME", "SDM", "SDM",
+                     "anchRec",
+                     "sardRec",
+                     "SST", "SST",
+                     "Transp", "Transp", "Transp", "Transp")
+
+projectDFA <- MARSS(y = projDat, 
+                    form = "dfa",
+                    method = "BFGS",
+                    # control = list(maxit = 10000,
+                    #                conv.test.slope.tol = 0.1,
+                    #                allow.degen = TRUE),
+                    inits = list(x0 = matrix(1, 1, 1)),
+                    z.score = TRUE,
+                    model = list(#R = "diagonal and equal", # observation errors are the same
+                      # R = "diagonal and unequal", # observation errors independent
+                      # R = "equalvarcov", # observation errors equal and covars equal
+                      # R = "unconstrained", # all observation errors independent
+                      R = RcustProj,
+                      m = 4) # number of latent processes
+)
+
+# save(projectDFA, file = "marssFit_1980to2019_ProjDFA_3trend_Rcustom.RData")
+# save(projectDFA, file = "marssFit_1980to2019_ProjDFA_4trend_Rcustom.RData")
+
+# Look at factor loadings
+# get the inverse of the rotation matrix 
+Z.est <- coef(projectDFA, type = "matrix")$Z 
+H.inv <- 1 
+if (ncol(Z.est) > 1){
+  H.inv <- varimax(coef(projectDFA, type = "matrix")$Z)$rotmat
+} 
+
+# rotate factor loadings 
+Z.rot <- Z.est %*% H.inv 
+# rotate trends 
+trends.rot <- solve(H.inv) %*% projectDFA$states
+
+# Add CIs to marssMLE object 
+projectDFA <- MARSSparamCIs(projectDFA) 
+# Use coef() to get the upper and lower CIs 
+Z.low <- coef(projectDFA, type = "Z", what = "par.lowCI") 
+Z.up <- coef(projectDFA, type = "Z", what = "par.upCI") 
+Z.rot.up <- Z.up %*% H.inv 
+Z.rot.low <- Z.low %*% H.inv 
+df <- data.frame(est = as.vector(Z.rot), 
+                 conf.up = as.vector(Z.rot.up), 
+                 conf.low = as.vector(Z.rot.low) )
+
+# plot(c(1990:2019), y= projectDFA$states, type = "l")
+# abline(h = 0)
+# 
+# plot loadings
+# new df with coordinates
+loadingsDF <- data.frame(index = datNames,
+                         trend1 = Z.rot[, 1],
+                         trend2 = Z.rot[, 2],
+                         trend3 = Z.rot[, 3],
+                         trend4 = Z.rot[, 4],
+                         dummy0 = 0) %>%
+  pivot_longer(cols = c(trend1, trend2, trend3, trend4), 
+               names_to = "Trend")
+
+loadingsDF %>% ggplot(aes(y = index)) +
+  geom_segment(aes(x = dummy0,
+                   yend = index,
+                   xend = value)) +
+  facet_wrap(~Trend) +
+  labs(x = "Loadings", y = "Index") +
+  geom_vline(xintercept = 0, color = "grey") +
+  theme_classic()
+
+# fits to data from pg 137 in MARSS User Guide
+alpha <- 0.05 
+d <- residuals(projectDFA, type = "tT") 
+d$up <- qnorm(1- alpha / 2) * d$.sigma + d$.fitted 
+d$lo <- qnorm(alpha / 2) * d$.sigma + d$.fitted 
+ggplot(data = subset(d, name=="model" & 
+                       .rownames %in% c("sardRec", "anchRec", "sardLarv", 
+                                        "anchLarv", "anchBioSmrySeas2", 
+                                        "sardBioSmrySeas2"))) + 
+  geom_point(aes(t, value)) + 
+  geom_ribbon(aes(x = t, ymin = lo, ymax = up), linetype = 2, alpha = 0.2) + 
+  geom_line(aes(t, .fitted), col="blue") + 
+  facet_wrap(~.rownames) + xlab("Time Step") + ylab("Count")
+
+
+
+# plot the factor loadings 
+spp <- rownames(allDat) 
+N.ts <- nrow(allDat)
+minZ <- 0.05 
+m <- dim(trends.rot)[1] 
+ylims <- c(-1.1 * max(abs(Z.rot)), 1.1 * max(abs(Z.rot))) 
+par(mfrow = c(ceiling(m / 2), 2), mar = c(3, 4, 1.5, 0.5), oma = c(0.4, 1, 1, 1)) 
+for (i in 1:m) { 
+  plot(c(1:N.ts)[abs(Z.rot[, i]) > minZ], as.vector(Z.rot[abs(Z.rot[, i]) > minZ, i]), 
+       type = "h", lwd = 2, xlab = "", ylab = "", xaxt = "n", ylim = ylims, xlim = c(0, N.ts + 1) ) 
+  for (j in 1:N.ts) { 
+    if (Z.rot[j, i] > minZ) { 
+      text(j,-0.05, spp[j], srt = 90, adj = 1, cex = 0.9) 
+    } 
+    if (Z.rot[j, i] <-minZ) { 
+      text(j, 0.05, spp[j], srt = 90, adj = 0, cex = 0.9) 
+    } 
+    abline(h = 0, lwd = 1, col = "gray") 
+  } # end j loop 
+  mtext(paste("Factor loadings on trend", i, sep = " "), side = 3, line = .5) 
+} # end i loop
+
+# get ts of trends
+ts.trends <- t(trends.rot)
+par(mfrow = c(ceiling(dim(ts.trends)[2] / 2), 2), mar = c(3, 4, 1.5, 0.5), oma = c(0.4, 1, 1, 1))
+# loop over each trend
+for (i in 1:dim(ts.trends)[2]) {
+  # set up plot area
+  plot(ts.trends[, i],
+       ylim = c(-1.1, 1.1) * max(abs(ts.trends)),
+       type = "n", lwd = 2, bty = "L",
+       xlab = "", ylab = "", xaxt = "n", yaxt = "n"
+  )
+  # draw zero-line
+  abline(h = 0, col = "gray")
+  # plot trend line
+  par(new = TRUE)
+  plot(ts.trends[, i],
+       ylim = c(-1.1, 1.1) * max(abs(ts.trends)),
+       type = "l", lwd = 2, bty = "L",
+       xlab = "", ylab = "", xaxt = "n"
+  )
+  # add panel labels
+  mtext(paste("Trend", i, sep = " "), side = 3, line = 0.5)
+  axis(1,  (0:dim(allDat)[2]) , 1980 + 0:dim(allDat)[2])
+} # end i loop (trends)
 
 # Plots for ECCWO poster --------------------------------------------------
 

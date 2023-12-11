@@ -89,8 +89,8 @@ transport %>%
   facet_grid(rows = vars(ESM), cols = vars(seas))+
   theme_classic()
 
-  # pivot_wider(names_from = seas, names_prefix = "avgNearTrans",
-  #             values_from = avgNearshTran) %>%
+transport <- transport %>%  pivot_wider(names_from = seas, names_prefix = "avgNearTrans",
+                                        values_from = avgNearshTransp) #%>%
   # full_join(y = transport, by = "year")
 
 # NEMURO plankton
@@ -107,8 +107,11 @@ nemuroZ <- nemuroZ %>% filter(GCM != "HIST") %>%
               rename(ESM = GCM)
 
 # Join together and calculate zscores based on mean and sd of training dataset
-projDat <- sstProj %>% #full_join(y= transport, by = c("year", "ESM")) %>%
+projDat <- sstProj %>% full_join(y= transport, by = c("year", "ESM")) %>%
               full_join(y= nemuroZ, by = c("year", "ESM"))
+
+projDat <- projDat %>% mutate(avgNearTransspring = as.numeric(avgNearTransspring),
+                              avgNearTranssummer = as.numeric(avgNearTranssummer))
 
 # read training dataset
 datDFA <- read_csv("C:/Users/r.wildermuth/Documents/FutureSeas/RecruitmentIndex/recrmntDFA/recrDFAdat.csv")
@@ -152,7 +155,7 @@ projDat[c("HCI", "NCOPspring", "NCOPsummer", "SCOPspring", "SCOPsummer",
           "sardLarv", "anchLarv", "mesopelLarv", "anchYoY", "age1SprSardmeanWAA", 
           "meanSSBwt", "copBio", "naupBio", "sardSpawnHab", "anchSpawnHab", 
           "daysAbove5pct", "daysAbove40pct", "sardNurseHab", "anchNurseHab", 
-          "anchRec", "sardRec", "avgNearTransspring", "avgNearTranssummer", 
+          "anchRec", "sardRec", #"avgNearTransspring", "avgNearTranssummer", 
           "avgOffTransspring", "avgOffTranssummer", "albacore", "hake")] <- NA
 
 # select variables in same order as provided to model

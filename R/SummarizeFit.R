@@ -4,26 +4,30 @@
 library(tidyverse)
 library(MARSS)
 
+# load(file = "marssFit_1980to2019_noBio_3trend_Rcustom.RData")
+load(file = "marssFit_1980to2019_ProjDFA_3trend_Rcustom.RData")
+
+
 # Estimated fit of MLE DFA ------------------------------------------------
 
 # Look at factor loadings
 # get the inverse of the rotation matrix 
-Z.est <- coef(overallDFA, type = "matrix")$Z 
+Z.est <- coef(projectDFA, type = "matrix")$Z 
 H.inv <- 1 
 if (ncol(Z.est) > 1){
-  H.inv <- varimax(coef(overallDFA, type = "matrix")$Z)$rotmat
+  H.inv <- varimax(coef(projectDFA, type = "matrix")$Z)$rotmat
 } 
 
 # rotate factor loadings 
 Z.rot <- Z.est %*% H.inv 
 # rotate trends 
-trends.rot <- solve(H.inv) %*% overallDFA$states
+trends.rot <- solve(H.inv) %*% projectDFA$states
 
 # Add CIs to marssMLE object 
-overallDFA <- MARSSparamCIs(overallDFA) 
+projectDFA <- MARSSparamCIs(projectDFA) 
 # Use coef() to get the upper and lower CIs 
-Z.low <- coef(overallDFA, type = "Z", what = "par.lowCI") 
-Z.up <- coef(overallDFA, type = "Z", what = "par.upCI") 
+Z.low <- coef(projectDFA, type = "Z", what = "par.lowCI") 
+Z.up <- coef(projectDFA, type = "Z", what = "par.upCI") 
 Z.rot.up <- Z.up %*% H.inv 
 Z.rot.low <- Z.low %*% H.inv 
 df <- data.frame(ind = rownames(Z.rot),
@@ -33,23 +37,41 @@ df <- data.frame(ind = rownames(Z.rot),
                  conf.low = as.vector(Z.rot.low))
 
 # Review significance of loadings and trends
-df <- df %>% mutate(diff0 = case_when(est > 0 & conf.low > 0 ~ TRUE,
+df <- df %>% mutate(diff0 = case_when(est > 0 & conf.low > 0 ~ TRUE, # RW!: low CI not always < high CI
                                       est < 0 & conf.up < 0 ~ TRUE,
                                       .default = FALSE))
 
 df %>% filter(ind %in% c("sardRec", "anchRec", "sardLarv", 
-                         "anchLarv", "anchYoY"))
+                         "anchLarv", "anchYoY")) %>%
+  arrange(ind)
 
 # indicators with no significant loadings
 df %>% group_by(ind) %>% summarize(anyDiff0 = sum(diff0)) %>% filter(anyDiff0 == 0)
 
+# Find variables with highest, most precise loadings and lowest, least precise loadings
+df <- df %>% mutate(interval = abs(conf.up-conf.low),
+                    magnLoading = abs(est))
+df %>% arrange(trend, interval, magnLoading)
+hiLoading <- df %>% group_by(trend) %>% slice_max(magnLoading, n = 10) %>% print(n = 40)
+mostPrecise <- df %>% group_by(trend) %>% slice_min(interval, n = 10) %>% print(n = 40)
+loLoading <- df %>% group_by(trend) %>% slice_min(magnLoading, n = 10) %>% print(n = 40)
+leastPrecise <- df %>% group_by(trend) %>% slice_max(interval, n = 10) %>% print(n = 40)
+
+hiLoading <- hiLoading %>% group_by(ind) %>% summarize(counts = n()) %>% arrange(counts) %>% print(n = 30)
+mostPrecise <- mostPrecise %>% group_by(ind) %>% summarize(counts = n()) %>% arrange(counts) %>% print(n = 30)
+hiLoading %>% inner_join(y = mostPrecise, by = "ind") %>% print(n = 30)
+
+loLoading <- loLoading %>% group_by(ind) %>% summarize(counts = n()) %>% arrange(counts) %>% print(n = 30)
+leastPrecise <- leastPrecise %>% group_by(ind) %>% summarize(counts = n()) %>% arrange(counts) %>% print(n = 30)
+loLoading %>% inner_join(y = leastPrecise, by = "ind") %>% print(n = 30)
+
 # Calculate RMSE for each indicator on estimates conditioned on all the data (tT)
-resids <- residuals(overallDFA, type = "tT") %>% filter(name == "model")
+resids <- residuals(projectDFA, type = "tT") %>% filter(name == "model")
 
 resids %>% group_by(.rownames) %>% summarize(sosRes = sum(.resids^2, na.rm = TRUE),
                                              nObs = n() - sum(is.na(value))) %>%
   mutate(RMSE = sqrt(sosRes/nObs)) %>% arrange(RMSE) %>%
-  # filter(.rownames %in% c("sardRec", "anchRec", "sardLarv", 
+  # filter(.rownames %in% c("sardRec", "anchRec", "sardLarv",
   #                   "anchLarv", "anchYoY")) %>%
   summarize(totRMSE = sum(RMSE))
 
