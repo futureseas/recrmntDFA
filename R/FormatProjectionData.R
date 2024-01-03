@@ -143,7 +143,7 @@ projDat <- projDat %>% pivot_longer(-c(year, ESM), names_to = "var", values_to =
                     "avgNearTranssummer", "avgOffTransspring", 
                     "avgOffTranssummer", "ZM_NorCal", "ZM_SoCal")) %>%
   full_join(y = projHistSmry, by = c("var", "ESM")) %>%
-  mutate(scaled = (vals - histMean)/histSD) %>% 
+  mutate(scaled = (vals - histMean)/histSD) %>%
   select(year, ESM, var, scaled) %>%
   pivot_wider(names_from = var, values_from = scaled)
 

@@ -1,0 +1,46 @@
+initYr,Rstructure,mTrends,nIndices,peels,LFOIC,
+1980,Rcustom,1,45,10,20.0871834,
+1980,Rcustom,2,45,10,18.4145008,
+1980,Rcustom,3,45,10,16.76948837,
+1980,Rcustom,4,45,10,15.7244299,
+1980,Rcustom,5,45,10,14.75065608,Had NaNs produced warnings on exit
+1980,diag & equal,1,45,10,19.82893072,
+1980,diag & equal,2,45,10,19.02605064,
+1980,diag & equal,3,45,10,15.26509855,
+1980,diag & equal,4,45,10,14.16880457,
+1980,diag & equal,5,45,10,13.79177448,
+1980,diag & unequal,1,45,10,20.24561113,
+1980,diag & unequal,2,45,10,18.63121636,
+1980,diag & unequal,3,45,10,16.92176608,
+1980,diag & unequal,4,45,10,16.06522761,
+1980,diag & unequal,5,45,10,15.63086933,Had NaNs produced warnings on exit
+1985,Rcustom,1,45,10,19.90540894,
+1985,Rcustom,2,45,10,17.95454669,
+1985,Rcustom,3,45,10,16.07342949,
+1985,Rcustom,4,45,10,15.04762305,
+1985,Rcustom,5,45,10,14.56738745,Had NaNs produced warnings on exit
+1985,diag & equal,1,45,10,19.63878141,
+1985,diag & equal,2,45,10,18.24428557,
+1985,diag & equal,3,45,10,15.90208437,
+1985,diag & equal,4,45,10,14.41453058,
+1985,diag & equal,5,45,10,13.24102289,
+1985,diag & unequal,1,45,10,20.06742168,
+1985,diag & unequal,2,45,10,18.04353163,
+1985,diag & unequal,3,45,10,16.41546221,
+1985,diag & unequal,4,45,10,16.37703554,Had NaNs produced warnings on exit
+1985,diag & unequal,5,45,10,15.25698031,Had NaNs produced warnings on exit
+1990,Rcustom,1,45,10,19.54498684,
+1990,Rcustom,2,45,10,18.5091727,
+1990,Rcustom,3,45,10,16.40082664,
+1990,Rcustom,4,45,10,14.84664629,
+1990,Rcustom,5,45,10,13.63778341,Had NaNs produced warnings on exit
+1990,diag & equal,1,45,10,19.23240324,
+1990,diag & equal,2,45,10,16.90506836,
+1990,diag & equal,3,45,10,15.25269631,
+1990,diag & equal,4,45,10,13.17314501,
+1990,diag & equal,5,45,10,12.23291821,
+1990,diag & unequal,1,45,10,19.73558529,
+1990,diag & unequal,2,45,10,18.11345609,Had NaNs produced warnings on exit
+1990,diag & unequal,3,45,10,16.34688488,
+1990,diag & unequal,4,45,10,13.78239524,
+1990,diag & unequal,5,45,10,13.81177294,Had NaNs produced warnings on exit

@@ -291,7 +291,7 @@ for (i in 1:dim(ts.trends)[2]) {
 
 
 # subset from 1980 to 2019
-allDat <- datDFA %>% filter(year %in% 1980:2019) %>%
+allDat <- datDFA %>% filter(year %in% 1990:2019) %>%
             # remove contemporary adult biomass with recruits, should be S2 biomass -> S1 recs
             select(-c(NOI,
                       ENSO,
@@ -306,6 +306,8 @@ allDat <- datDFA %>% filter(year %in% 1980:2019) %>%
                       # SCOPspring, # summer copepod index had higher loadings
                       PDOsummer, # lower loading than spring, may want to try a lag
                       PDOspring,
+                      NCOPsummer,
+                      SCOPsummer,
                       # BEUTI_33N, # oceanography at 39N had highest loadings
                       # OC_LUSI_33N,
                       # OC_LUSI_36N,
@@ -327,7 +329,7 @@ allDat <- allDat %>% select(-year) %>% t()
 
 # Create a custom R obs error matrix assuming each data source has it's own common error
 Rcustom <- matrix(list(0),length(datNames),length(datNames)) 
-diag(Rcustom) <- c("HCI",
+diag(Rcustom) <- c("HCI", "HCI",
                    "COP", "COP", "COP", "COP",
                    "BEUTI", "BEUTI", 
                    "CUTI", "CUTI",
@@ -362,11 +364,13 @@ overallDFA <- MARSS(y = allDat,
                                # R = "equalvarcov", # observation errors equal and covars equal
                                # R = "unconstrained", # all observation errors independent
                                R = Rcustom,
-                               m = 4) # number of latent processes
+                               m = 5) # number of latent processes
 )
 
 # save(overallDFA, file = "marssFit_1980to2019_noBio_3trend_Rcustom.RData")
-# save(overallDFA, file = "marssFit_1980to2019_noBio_4trend_Rcustom.RData")
+# save(overallDFA, file = "marssFit_1980to2019_noBio_5trend_Rcustom.RData")
+# save(overallDFA, file = "marssFit_1990to2019_noBio_5trend_DiagEql.RData")
+save(overallDFA, file = "marssFit_1990to2019_noBio_5trend_Rcustom.RData")
 
 # Look at factor loadings
 # get the inverse of the rotation matrix 
@@ -697,10 +701,10 @@ test1 <- loadingsDF %>% pivot_longer(cols = grep("vals.", names(loadingsDF), val
   mutate(vals = case_when(abs(vals) < 0.05 ~ 0,
                           TRUE ~ vals),
          colCode = case_when(index %in% c("age1SprSardmeanWAA", "meanSSBwt",
-                                          "NCOPspring", "NCOPsummer",                  
-                                          "SCOPspring", "SCOPsummer",
+                                          "NCOPspring", "NCOPsummerlag1",                  
+                                          "SCOPspring", "SCOPsummerlag1",
                                           "ZM_NorCal", "ZM_SoCal") ~"Preconditioning",#  "#FFB000",
-                             index %in% c("HCI", "sardSpawnHab", "anchSpawnHab",                
+                             index %in% c("HCI_R3", "HCI_R4", "sardSpawnHab", "anchSpawnHab",                
                                           "daysAbove5pct", "daysAbove40pct",
                                           "springSST", "summerSST") ~ "Temperature", #"#00BA38",
                              index %in% c("BEUTI_33N", "BEUTI_39N", "CUTI_33N",
