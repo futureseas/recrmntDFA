@@ -719,6 +719,9 @@ ggplot() +
   geom_sf(data = ccAtl, color = "black", size = 1.5, fill = NA) +
   coord_sf(xlim = c(-130, -115), ylim = c(28, 42)) +
   facet_wrap(~time)
+
+# save(sardSpawnGrounds, file = paste0(datPath, "histSardSpawnGr.RData"))
+# save(anchSpawnGrounds, file = paste0(datPath, "histAnchSpawnGr.RData"))
 ```
 
 Find proportion of breeding habitat in spawning ground

@@ -44,3 +44,9 @@ initYr,Rstructure,mTrends,nIndices,peels,LFOIC,
 1990,diag & unequal,3,45,10,16.34688488,
 1990,diag & unequal,4,45,10,13.78239524,
 1990,diag & unequal,5,45,10,13.81177294,Had NaNs produced warnings on exit
+1990,Rcustom,6,45,10,12.32626424,Had NaNs produced warnings on exit
+1990,Rcustom,7,45,10,10.0770169,Had NaNs produced warnings on exit
+1990,diag & equal,6,45,10,11.17112565,
+1990,diag & equal,7,45,10,9.977235379,
+1990,diag & unequal,6,45,10,16.15272821,Had NaNs produced warnings on exit
+1990,diag & unequal,7,45,10,41.41908518,Had NaNs produced warnings on exit

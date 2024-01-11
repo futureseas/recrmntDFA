@@ -485,11 +485,12 @@ for (i in 1:dim(ts.trends)[2]) {
 # Projection Model -----------------------------------------------------------
 
 # subset from 1980 to 2019
-projDat <- datDFA %>% filter(year %in% 1980:2019) %>%
+projDat <- datDFA %>% filter(year %in% 1990:2019) %>%
   # select only projectable vars and vars of interest
-  select("year", "BEUTI_33N", "BEUTI_39N", "CUTI_33N", "CUTI_39N", "OC_LUSI_33N",
+  select("year", "HCI_R3", "HCI_R4", "BEUTI_33N", "BEUTI_39N", "CUTI_33N", 
+         "CUTI_39N", "OC_LUSI_33N",
          "OC_LUSI_36N", "OC_LUSI_39N", "OC_STI_33N", "OC_STI_36N", "OC_STI_39N",
-         "avgSSWIspring", "avgSSWIsummer", "sardLarv", "anchLarv", "anchYoY",
+         "sardLarv", "anchLarv", "anchYoY", 
          "ZM_NorCal", "ZM_SoCal", "sardSpawnHab", "anchSpawnHab", "daysAbove5pct",
          "daysAbove40pct", "sardNurseHab", "anchNurseHab", "anchRec", "sardRec",
          "springSST", "summerSST", "avgNearTransspring", "avgNearTranssummer",
@@ -502,11 +503,11 @@ projDat <- projDat %>% select(-year) %>% t()
 
 # Create a custom R obs error matrix assuming each data source has it's own common error
 RcustProj <- matrix(list(0),length(datNames),length(datNames)) 
-diag(RcustProj) <- c("BEUTI", "BEUTI", 
+diag(RcustProj) <- c("HCI", "HCI", 
+                     "BEUTI", "BEUTI", 
                      "CUTI", "CUTI",
                      "LUSI", "LUSI", "LUSI", 
                      "STI", "STI", "STI",
-                     "SSWI", "SSWI",
                      "CalCOFI", "CalCOFI",
                      "RREAS",
                      "NEMURO", "NEMURO",
@@ -524,12 +525,12 @@ projectDFA <- MARSS(y = projDat,
                     #                allow.degen = TRUE),
                     inits = list(x0 = matrix(1, 1, 1)),
                     z.score = TRUE,
-                    model = list(#R = "diagonal and equal", # observation errors are the same
+                    model = list(R = "diagonal and equal", # observation errors are the same
                       # R = "diagonal and unequal", # observation errors independent
                       # R = "equalvarcov", # observation errors equal and covars equal
                       # R = "unconstrained", # all observation errors independent
-                      R = RcustProj,
-                      m = 4) # number of latent processes
+                      # R = RcustProj,
+                      m = 7) # number of latent processes
 )
 
 # save(projectDFA, file = "marssFit_1980to2019_ProjDFA_3trend_Rcustom.RData")
