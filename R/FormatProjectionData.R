@@ -6,6 +6,7 @@ library(sf)
 library(stars)
 library(cubelyr)
 library(units)
+library(tidync)
 
 # data file path
 datPath <- "C:/Users/r.wildermuth/Documents/FutureSeas/RecruitmentIndex/DFA_data/"
@@ -36,7 +37,8 @@ datPath <- "C:/Users/r.wildermuth/Documents/FutureSeas/RecruitmentIndex/DFA_data
 ## Fxn to process annual habitat values
 CalcAnnualHab <- function(sdmFiles, # character vector of filepaths to SDM output
                           threshold, # discrimination threshold from the SDM
-                          shp # shapefile of study are to clip map to
+                          shp, # shapefile of study are to clip map to
+                          dailyHab = FALSE # logical whether to include daily high quality habitat stars object
 ){
   sardSDMs <- read_stars(sdmFiles, proxy = FALSE, quiet = TRUE)
   
@@ -68,16 +70,13 @@ CalcAnnualHab <- function(sdmFiles, # character vector of filepaths to SDM outpu
   
   sardSpawnHab <- aggregate(sardSpawnYr, ccAtl, FUN = sum, na.rm = TRUE)
   
-  return(list(sardSpawnHab, sardSpawn))
+  if(dailyHab){
+    return(list(sardSpawnHab, sardSpawn))
+  } else {
+    return(list(sardSpawnHab))
+  }
+  
 }
-
-# sardine and anchovy have different breeding seasons
-sardFiles <- expand.grid("sardSDMs_proj", 3:7, 1980:2100) %>% 
-  mutate(sdmFile = paste(Var1, Var2, Var3, sep = "_")) %>%
-  pull(sdmFile)
-
-sardFiles <- paste0(datPath, "SDMoutput/proj_sardine/", sardFiles, ".nc")
-
 
 # Use CalCurrent Atlantis extent to limit sample frame
 ccAtl <- st_read("C:/Users/r.wildermuth/Documents/FutureSeas/MapFiles/emocc_whole_domain.shp")
@@ -89,11 +88,98 @@ newAtlbbox$ymax <- 40.0
 newAtlbbox <- st_bbox(unlist(newAtlbbox))
 ccAtl <- st_crop(ccAtl, newAtlbbox)
 
+## Nursury habitat area
+
+# discrimination threshold from Barb Muhling:
+sardLarvHabThresh <- 0.17
+
+# sardine and anchovy have different breeding seasons
+sardFiles19802040 <- expand.grid("sardLarvaeSDMs_proj", 3:7, 1980:2040) %>% 
+  mutate(sdmFile = paste(Var1, Var2, Var3, sep = "_")) %>%
+  pull(sdmFile)
+
+sardFiles19802040 <- paste0(datPath, "SDMoutput/proj_sardLarv/", sardFiles19802040, ".nc")
+
+sardLrvHab19802040 <- CalcAnnualHab(sdmFiles = sardFiles19802040, threshold = sardLarvHabThresh, 
+                                    shp = ccAtl)
+
+sardFiles20412100 <- expand.grid("sardLarvaeSDMs_proj", 3:7, 2041:2100) %>% 
+  mutate(sdmFile = paste(Var1, Var2, Var3, sep = "_")) %>%
+  pull(sdmFile)
+
+sardFiles20412100 <- paste0(datPath, "SDMoutput/proj_sardLarv/", sardFiles20412100, ".nc")
+
+sardLrvHab20412100 <- CalcAnnualHab(sdmFiles = sardFiles20412100, threshold = sardLarvHabThresh, 
+                                    shp = ccAtl)
+
+
+#  Anchovy 
+
+# discrimination threshold from Barb Muhling:
+anchLarvHabThresh <- 0.42
+
+anchFiles19802040 <- expand.grid("anchLarvaeSDMs_proj", 2:4, 1980:2040) %>% 
+  mutate(sdmFile = paste(Var1, Var2, Var3, sep = "_")) %>%
+  pull(sdmFile)
+
+anchFiles19802040 <- paste0(datPath, "SDMoutput/proj_anchLarv/", anchFiles19802040, ".nc")
+
+anchLrvHab19802040 <- CalcAnnualHab(sdmFiles = anchFiles19802040, threshold = anchLarvHabThresh, 
+                                    shp = ccAtl)
+
+anchFiles20412100 <- expand.grid("anchLarvaeSDMs_proj", 2:4, 2041:2100) %>% 
+  mutate(sdmFile = paste(Var1, Var2, Var3, sep = "_")) %>%
+  pull(sdmFile)
+
+anchFiles20412100 <- paste0(datPath, "SDMoutput/proj_anchLarv/", anchFiles20412100, ".nc")
+
+anchLrvHab20412100 <- CalcAnnualHab(sdmFiles = anchFiles20412100, threshold = anchLarvHabThresh, 
+                                    shp = ccAtl)
+
+nurseTS <- rbind(data.frame(year = 1980:2040,
+                      sardNurseHab_GFDL = t(sardLrvHab19802040[[1]]$predGAMBOOST_GFDL),
+                      sardNurseHab_IPSL = t(sardLrvHab19802040[[1]]$predGAMBOOST_IPSL),
+                      sardNurseHab_HAD = t(sardLrvHab19802040[[1]]$predGAMBOOST_HADL),
+                      anchNurseHab_GFDL = t(anchLrvHab19802040[[1]]$predGAMBOOST_GFDL),
+                      anchNurseHab_IPSL = t(anchLrvHab19802040[[1]]$predGAMBOOST_IPSL),
+                      anchNurseHab_HAD = t(anchLrvHab19802040[[1]]$predGAMBOOST_HADL)),
+                data.frame(year = 2041:2100,
+                           sardNurseHab_GFDL = t(sardLrvHab20412100[[1]]$predGAMBOOST_GFDL),
+                           sardNurseHab_IPSL = t(sardLrvHab20412100[[1]]$predGAMBOOST_IPSL),
+                           sardNurseHab_HAD = t(sardLrvHab20412100[[1]]$predGAMBOOST_HADL),
+                           anchNurseHab_GFDL = t(anchLrvHab20412100[[1]]$predGAMBOOST_GFDL),
+                           anchNurseHab_IPSL = t(anchLrvHab20412100[[1]]$predGAMBOOST_IPSL),
+                           anchNurseHab_HAD = t(anchLrvHab20412100[[1]]$predGAMBOOST_HADL)))
+
+nurseTS %>% pivot_longer(cols = -year, names_to = c("spp", "ESM"), names_sep = "_") %>%
+  ggplot() +
+  geom_line(aes(x = year, y = value, col = ESM)) +
+  facet_wrap(~spp)
+
+
+## Spawning Habitat
+
 # discrimination threshold from Barb Muhling:
 sardHabThresh <- 0.45
 
-sardSpHab <- CalcAnnualHab(sdmFiles = sardFiles, threshold = sardHabThresh, 
-                           shp = ccAtl)
+# sardine and anchovy have different breeding seasons
+sardFiles19802040 <- expand.grid("sardSDMs_proj", 3:7, 1980:2040) %>% 
+  mutate(sdmFile = paste(Var1, Var2, Var3, sep = "_")) %>%
+  pull(sdmFile)
+
+sardFiles19802040 <- paste0(datPath, "SDMoutput/proj_sardine/", sardFiles19802040, ".nc")
+
+sardSpHab19802040 <- CalcAnnualHab(sdmFiles = sardFiles19802040, threshold = sardHabThresh, 
+                           shp = ccAtl, dailyHab = TRUE)
+
+sardFiles20412100 <- expand.grid("sardSDMs_proj", 3:7, 2041:2100) %>% 
+  mutate(sdmFile = paste(Var1, Var2, Var3, sep = "_")) %>%
+  pull(sdmFile)
+
+sardFiles20412100 <- paste0(datPath, "SDMoutput/proj_sardine/", sardFiles20412100, ".nc")
+
+sardSpHab20412100 <- CalcAnnualHab(sdmFiles = sardFiles20412100, threshold = sardHabThresh, 
+                           shp = ccAtl, dailyHab = TRUE)
 # check space use:
 sort( sapply(ls(),function(x){object.size(get(x))})) 
 
@@ -144,69 +230,44 @@ sort( sapply(ls(),function(x){object.size(get(x))}))
 # 
 
 #  Anchovy 
-anchFiles <- expand.grid("anchSDMs_proj", 2:4, 1980:2100) %>% 
-  mutate(sdmFile = paste(Var1, Var2, Var3, sep = "_")) %>%
-  pull(sdmFile)
-
-anchFiles <- paste0(datPath, "SDMoutput/proj_anchovy/", anchFiles, ".nc")
 
 # discrimination threshold from Barb Muhling:
 anchHabThresh <- 0.29
 
-anchSpHab <- CalcAnnualHab(sdmFiles = anchFiles, threshold = anchHabThresh, 
-                           shp = ccAtl)
+anchFiles19802040 <- expand.grid("anchSDMs_proj", 2:4, 1980:2040) %>% 
+  mutate(sdmFile = paste(Var1, Var2, Var3, sep = "_")) %>%
+  pull(sdmFile)
 
-spawnTS <- data.frame(year = 1980:2100,
-                      sardSpawnHab_GFDL = t(sardSpHab[[1]]$predGAMBOOST_GFDL),
-                      sardSpawnHab_IPSL = t(sardSpHab[[1]]$predGAMBOOST_IPSL),
-                      sardSpawnHab_HAD = t(sardSpHab[[1]]$predGAMBOOST_HADL),
-                      anchSpawnHab_GFDL = t(anchSpHab[[1]]$predGAMBOOST_GFDL),
-                      anchSpawnHab_IPSL = t(anchSpHab[[1]]$predGAMBOOST_IPSL),
-                      anchSpawnHab_HAD = t(anchSpHab[[1]]$predGAMBOOST_HADL))
+anchFiles19802040 <- paste0(datPath, "SDMoutput/proj_anchovy/", anchFiles19802040, ".nc")
+
+anchSpHab19802040 <- CalcAnnualHab(sdmFiles = anchFiles19802040, threshold = anchHabThresh, 
+                           shp = ccAtl, dailyHab = TRUE)
+
+anchFiles20412100 <- expand.grid("anchSDMs_proj", 2:4, 2041:2100) %>% 
+  mutate(sdmFile = paste(Var1, Var2, Var3, sep = "_")) %>%
+  pull(sdmFile)
+
+anchFiles20412100 <- paste0(datPath, "SDMoutput/proj_anchovy/", anchFiles20412100, ".nc")
+
+anchSpHab20412100 <- CalcAnnualHab(sdmFiles = anchFiles20412100, threshold = anchHabThresh, 
+                           shp = ccAtl, dailyHab = TRUE)
+
+spawnTS <- rbind(data.frame(year = 1980:2040,
+                            sardSpawnHab_GFDL = t(sardSpHab19802040[[1]]$predGAMBOOST_GFDL),
+                            sardSpawnHab_IPSL = t(sardSpHab19802040[[1]]$predGAMBOOST_IPSL),
+                            sardSpawnHab_HAD = t(sardSpHab19802040[[1]]$predGAMBOOST_HADL),
+                            anchSpawnHab_GFDL = t(anchSpHab19802040[[1]]$predGAMBOOST_GFDL),
+                            anchSpawnHab_IPSL = t(anchSpHab19802040[[1]]$predGAMBOOST_IPSL),
+                            anchSpawnHab_HAD = t(anchSpHab19802040[[1]]$predGAMBOOST_HADL)),
+                 data.frame(year = 2041:2100,
+                            sardSpawnHab_GFDL = t(sardSpHab20412100[[1]]$predGAMBOOST_GFDL),
+                            sardSpawnHab_IPSL = t(sardSpHab20412100[[1]]$predGAMBOOST_IPSL),
+                            sardSpawnHab_HAD = t(sardSpHab20412100[[1]]$predGAMBOOST_HADL),
+                            anchSpawnHab_GFDL = t(anchSpHab20412100[[1]]$predGAMBOOST_GFDL),
+                            anchSpawnHab_IPSL = t(anchSpHab20412100[[1]]$predGAMBOOST_IPSL),
+                            anchSpawnHab_HAD = t(anchSpHab20412100[[1]]$predGAMBOOST_HADL)))
 
 spawnTS %>% pivot_longer(cols = -year, names_to = c("spp", "ESM"), names_sep = "_") %>%
-  ggplot() +
-  geom_line(aes(x = year, y = value, col = ESM)) +
-  facet_wrap(~spp)
-
-## Nursury habitat area
-
-# sardine and anchovy have different breeding seasons
-sardFiles <- expand.grid("sardLarvaeSDMs_proj", 3:7, 1980:2100) %>% 
-  mutate(sdmFile = paste(Var1, Var2, Var3, sep = "_")) %>%
-  pull(sdmFile)
-
-sardFiles <- paste0(datPath, "SDMoutput/proj_sardLarv/", sardFiles, ".nc")
-
-# discrimination threshold from Barb Muhling:
-sardLarvHabThresh <- 0.17
-
-sardLrvHab <- CalcAnnualHab(sdmFiles = sardFiles, threshold = sardLarvHabThresh, 
-                            shp = ccAtl)
-
-
-#  Anchovy 
-anchFiles <- expand.grid("anchLarvaeSDMs_proj", 2:4, 1980:2100) %>% 
-  mutate(sdmFile = paste(Var1, Var2, Var3, sep = "_")) %>%
-  pull(sdmFile)
-
-anchFiles <- paste0(datPath, "SDMoutput/proj_anchLarv/", anchFiles, ".nc")
-
-# discrimination threshold from Barb Muhling:
-anchLarvHabThresh <- 0.42
-
-anchLrvHab <- CalcAnnualHab(sdmFiles = anchFiles, threshold = anchLarvHabThresh, 
-                            shp = ccAtl)
-
-nurseTS <- data.frame(year = 1980:2100,
-                      sardSpawnHab_GFDL = t(sardLrvHab[[1]]$predGAMBOOST_GFDL),
-                      sardSpawnHab_IPSL = t(sardLrvHab[[1]]$predGAMBOOST_IPSL),
-                      sardSpawnHab_HAD = t(sardLrvHab[[1]]$predGAMBOOST_HADL),
-                      anchSpawnHab_GFDL = t(anchLrvHab[[1]]$predGAMBOOST_GFDL),
-                      anchSpawnHab_IPSL = t(anchLrvHab[[1]]$predGAMBOOST_IPSL),
-                      anchSpawnHab_HAD = t(anchLrvHab[[1]]$predGAMBOOST_HADL))
-
-nurseTS %>% pivot_longer(cols = -year, names_to = c("spp", "ESM"), names_sep = "_") %>%
   ggplot() +
   geom_line(aes(x = year, y = value, col = ESM)) +
   facet_wrap(~spp)
@@ -220,81 +281,126 @@ load(file = paste0(datPath, "histAnchSpawnGr.RData"))
 
 #Find proportion of breeding habitat in spawning ground
 # convert spawning days to categorical
-sardSpawn1NA <- sardSpHab[[2]]
+sardSpawn1NA19802040 <- sardSpHab19802040[[2]]
 # find number of high probability cells at each time
-sardAggSpwn <- aggregate(sardSpawn1NA, by = ccAtl, FUN = sum, na.rm = TRUE)
+# sardAggSpwn19802040 <- aggregate(sardSpawn1NA19802040, by = ccAtl, FUN = sum, na.rm = TRUE)
 # sardAggSpwn <- t(sardAggSpwn$sard_3_1998_mboost_roms.nc)
-sardSpawn1NA[sardSpHab[[2]] > sardHabThresh] <- 1 # should only be NAs and 1s
+sardSpawn1NA19802040[sardSpHab19802040[[2]] > sardHabThresh] <- 1 # should only be NAs and 1s
 
 # find number of cells in spawning grounds
 sardSpGrdDenom <- aggregate(sardSpawnGrounds, by = ccAtl, FUN = sum, na.rm = TRUE)
 # sardSpGrdDenom <- as.numeric(sardSpGrdDenom$sard_3_1998_mboost_roms.nc)
 
 # find number of high probability cells at each time
-sardSpGrdNum <- aggregate(sardSpawn1NA, by = ccAtl, FUN = sum, na.rm = TRUE)
+sardSpGrdNum19802040 <- aggregate(sardSpawn1NA19802040, by = ccAtl, FUN = sum, na.rm = TRUE)
 # sardSpGrdNum <- t(sardSpGrdNum$sard_3_1998_mboost_roms.nc) 
 
-sardSpDates <- data.frame(date = st_get_dimension_values(sardSpHab[[2]], which = "time"),
+
+# convert spawning days to categorical
+sardSpawn1NA20412100 <- sardSpHab20412100[[2]]
+# find number of high probability cells at each time
+# sardAggSpwn20412100 <- aggregate(sardSpawn1NA20412100, by = ccAtl, FUN = sum, na.rm = TRUE)
+# sardAggSpwn <- t(sardAggSpwn$sard_3_1998_mboost_roms.nc)
+sardSpawn1NA20412100[sardSpHab20412100[[2]] > sardHabThresh] <- 1 # should only be NAs and 1s
+
+# find number of high probability cells at each time
+sardSpGrdNum20412100 <- aggregate(sardSpawn1NA20412100, by = ccAtl, FUN = sum, na.rm = TRUE)
+
+sardSpDates <- rbind(data.frame(date = st_get_dimension_values(sardSpHab19802040[[2]], which = "time"),
                           # propSpawn = sardSpGrdNum/sardSpGrdDenom,
                           # aggSpawn = sardAggSpwn,
-                          propSpawn_GFDL = t(sardSpGrdNum$predGAMBOOST_GFDL)/t(sardSpGrdDenom$predGAMBOOST_GFDL),
-                          propSpawn_IPSL = t(sardSpGrdNum$predGAMBOOST_IPSL)/t(sardSpGrdDenom$predGAMBOOST_IPSL),
-                          propSpawn_HAD = t(sardSpGrdNum$predGAMBOOST_HADL),t(sardSpGrdDenom$predGAMBOOST_HADL),
-                          aggSpawn_GFDL = t(sardAggSpwn$predGAMBOOST_GFDL),
-                          aggSpawn_IPSL = t(sardAggSpwn$predGAMBOOST_IPSL),
-                          aggSpawn_HAD = t(sardAggSpwn$predGAMBOOST_HADL)) %>%
+                          propSpawn_GFDL = t(sardSpGrdNum19802040$predGAMBOOST_GFDL),
+                          propSpawn_IPSL = t(sardSpGrdNum19802040$predGAMBOOST_IPSL),
+                          propSpawn_HAD = t(sardSpGrdNum19802040$predGAMBOOST_HADL)),
+                data.frame(date = st_get_dimension_values(sardSpHab20412100[[2]], which = "time"),
+                          # propSpawn = sardSpGrdNum/sardSpGrdDenom,
+                          # aggSpawn = sardAggSpwn,
+                          propSpawn_GFDL = t(sardSpGrdNum20412100$predGAMBOOST_GFDL),
+                          propSpawn_IPSL = t(sardSpGrdNum20412100$predGAMBOOST_IPSL),
+                          propSpawn_HAD = t(sardSpGrdNum20412100$predGAMBOOST_HADL))) %>%
   mutate(year = year(ymd(date)),
-         dayofYr = yday(date))
+         dayofYr = yday(date),
+         propSpawn_GFDL = propSpawn_GFDL/as.vector(sardSpGrdDenom$sard_3_1998_mboost_roms.nc),
+         propSpawn_IPSL = propSpawn_IPSL/as.vector(sardSpGrdDenom$sard_3_1998_mboost_roms.nc),
+         propSpawn_HAD = propSpawn_HAD/as.vector(sardSpGrdDenom$sard_3_1998_mboost_roms.nc))
 
 # summary(sardSpGrdNum/sardSpGrdDenom)
 
-sardSpDates %>% #filter(year == 2015) %>%
-  ggplot(aes(x = dayofYr, y = propSpawn)) +
-  geom_line() +
-  geom_hline(yintercept = quantile(sardSpGrdNum/sardSpGrdDenom, probs = c(0.1, 0.2, 0.5))) +
-  facet_wrap(~year, scales = "free_y")
-
-sardSpDates %>% #filter(year == 2015) %>%
-  ggplot(aes(x = dayofYr, y = aggSpawn)) +
-  geom_line() +
-  geom_hline(yintercept = quantile(sardAggSpwn, probs = c(0.1, 0.2, 0.5))) +
-  facet_wrap(~year, scales = "free_y")
+# sardSpDates %>% #filter(year == 2015) %>%
+#   ggplot(aes(x = dayofYr, y = propSpawn)) +
+#   geom_line() +
+#   geom_hline(yintercept = quantile(sardSpGrdNum/sardSpGrdDenom, probs = c(0.1, 0.2, 0.5))) +
+#   facet_wrap(~year, scales = "free_y")
+# 
+# sardSpDates %>% #filter(year == 2015) %>%
+#   ggplot(aes(x = dayofYr, y = aggSpawn)) +
+#   geom_line() +
+#   geom_hline(yintercept = quantile(sardAggSpwn, probs = c(0.1, 0.2, 0.5))) +
+#   facet_wrap(~year, scales = "free_y")
 
 # Calculate number of days 5% of spawning grounds contain high quality habitat
-sardSpawnDays <- sardSpDates %>% filter(propSpawn >= 0.05) %>% 
-  group_by(year) %>%
-  summarize(daysAbove5pct = n())
+sardSpawnDays <- sardSpDates %>% pivot_longer(c(propSpawn_GFDL, 
+                                                propSpawn_IPSL, 
+                                                propSpawn_HAD), 
+                                              names_to = "ESM",
+                                              values_to = "propSpawn") %>%
+  filter(propSpawn >= 0.05) %>% 
+  group_by(year, ESM) %>%
+  summarize(daysAbove5pct = n()) %>% 
+  mutate(ESM = sub("propSpawn_", "", ESM))
 
 # convert spawning days to categorical
-anchSpawn1NA <- anchSpHab[[2]]
-anchSpawn1NA[anchSpHab[[2]] > anchHabThresh] <- 1 # should only be NAs and 1s
+anchSpawn1NA19802040 <- anchSpHab19802040[[2]]
+anchSpawn1NA19802040[anchSpHab19802040[[2]] > anchHabThresh] <- 1 # should only be NAs and 1s
 
 # find number of cells in spawning grounds
 anchSpGrdDenom <- aggregate(anchSpawnGrounds, by = ccAtl, FUN = sum, na.rm = TRUE)
-anchSpGrdDenom <- as.numeric(anchSpGrdDenom$anch_2_1998_mboost_roms.nc)
+# anchSpGrdDenom <- as.numeric(anchSpGrdDenom$anch_2_1998_mboost_roms.nc)
 
 # find number of high probability cells at each time
-anchSpGrdNum <- aggregate(anchSpawn1NA, by = ccAtl, FUN = sum, na.rm = TRUE)
-anchSpGrdNum <- t(anchSpGrdNum$anch_2_1998_mboost_roms.nc) 
+anchSpGrdNum19802040 <- aggregate(anchSpawn1NA19802040, by = ccAtl, FUN = sum, na.rm = TRUE)
 
-anchSpDates <- data.frame(date = st_get_dimension_values(anchSpHab[[2]], which = "time"),
-                          propSpawn = anchSpGrdNum/anchSpGrdDenom) %>%
+anchSpawn1NA20412100 <- anchSpHab20412100[[2]]
+anchSpawn1NA20412100[anchSpHab20412100[[2]] > anchHabThresh] <- 1 # should only be NAs and 1s
+
+# find number of high probability cells at each time
+anchSpGrdNum20412100 <- aggregate(anchSpawn1NA20412100, by = ccAtl, FUN = sum, na.rm = TRUE)
+
+anchSpDates <- rbind(data.frame(date = st_get_dimension_values(anchSpHab19802040[[2]], which = "time"),
+                                propSpawn_GFDL = t(anchSpGrdNum19802040$predGAMBOOST_GFDL),
+                                propSpawn_IPSL = t(anchSpGrdNum19802040$predGAMBOOST_IPSL),
+                                propSpawn_HAD = t(anchSpGrdNum19802040$predGAMBOOST_HADL)),
+                     data.frame(date = st_get_dimension_values(anchSpHab20412100[[2]], which = "time"),
+                                propSpawn_GFDL = t(anchSpGrdNum20412100$predGAMBOOST_GFDL),
+                                propSpawn_IPSL = t(anchSpGrdNum20412100$predGAMBOOST_IPSL),
+                                propSpawn_HAD = t(anchSpGrdNum20412100$predGAMBOOST_HADL))) %>%
   mutate(year = year(ymd(date)),
-         dayofYr = yday(date))
+         dayofYr = yday(date),
+         propSpawn_GFDL = propSpawn_GFDL/as.vector(anchSpGrdDenom$anch_2_1998_mboost_roms.nc),
+         propSpawn_IPSL = propSpawn_IPSL/as.vector(anchSpGrdDenom$anch_2_1998_mboost_roms.nc),
+         propSpawn_HAD = propSpawn_HAD/as.vector(anchSpGrdDenom$anch_2_1998_mboost_roms.nc))
 
-summary(anchSpGrdNum/anchSpGrdDenom)
-
-anchSpDates %>% #filter(year == 2015) %>%
-  ggplot(aes(x = dayofYr, y = propSpawn)) +
-  geom_line() +
-  geom_hline(yintercept = quantile(anchSpGrdNum/anchSpGrdDenom, probs = c(0.1, 0.2, 0.5))) +
-  facet_wrap(~year, scales = "free_y")
+# summary(anchSpGrdNum/anchSpGrdDenom)
+# 
+# anchSpDates %>% #filter(year == 2015) %>%
+#   ggplot(aes(x = dayofYr, y = propSpawn)) +
+#   geom_line() +
+#   geom_hline(yintercept = quantile(anchSpGrdNum/anchSpGrdDenom, probs = c(0.1, 0.2, 0.5))) +
+#   facet_wrap(~year, scales = "free_y")
 
 # Calculate number of days 40% of spawning grounds contain high quality habitat
-anchSpawnDays <- anchSpDates %>% filter(propSpawn >= 0.4) %>% 
-  group_by(year) %>%
-  summarize(daysAbove40pct = n())
+anchSpawnDays <- anchSpDates %>% pivot_longer(c(propSpawn_GFDL, 
+                                                propSpawn_IPSL, 
+                                                propSpawn_HAD), 
+                                              names_to = "ESM",
+                                              values_to = "propSpawn") %>% 
+  filter(propSpawn >= 0.4) %>% 
+  group_by(year, ESM) %>%
+  summarize(daysAbove40pct = n()) %>% 
+  mutate(ESM = sub("propSpawn_", "", ESM))
 
+
+# SST ---------------------------------------------------------------------
 
 # From Mer Pozo Buil (6/4/2023): "monthly SST averaged for the diagonal CalCOFI region for the 3 datasets:
 # ROMS-ESMS: includes the 3 projections (ROMS-GFDL, ROMS-IPSL, and ROMS-HAD) from 1980-2100
@@ -319,6 +425,8 @@ sstProj %>% ggplot(aes(x = year, y = SST, color = ESM)) +
   theme_classic()
 
 sstProj <- sstProj %>% pivot_wider(names_from = seas, values_from = SST)
+
+# Poleward transport ------------------------------------------------------
 
 # Northward transport across 32N
 # Downloaded from Mike Jacox (8/18/2023)
@@ -397,6 +505,8 @@ transport <- transport %>%  pivot_wider(names_from = seas, #names_prefix = "avgN
                                         values_from = c(avgNearshTransp, avgOffshTransp)) #%>%
 # full_join(y = transport, by = "year")
 
+# NEMURO Zooplk'n ---------------------------------------------------------
+
 # NEMURO plankton
 nemuroZ <- read_csv(paste0(datPath, "ROMS-NEMURO spring plankton.csv"))
 
@@ -411,12 +521,200 @@ nemuroZ <- nemuroZ %>% filter(GCM != "HIST") %>%
   rename(ESM = GCM)
 
 
-# Join together and calculate zscores based on mean and sd of training dataset
-projDat <- sstProj %>% full_join(y= transport, by = c("year", "ESM")) %>%
-              full_join(y= nemuroZ, by = c("year", "ESM"))
+# ROMS upwelling indicators -----------------------------------------------
+# library(ncdf4)
 
-projDat <- projDat %>% mutate(avgNearTransspring = as.numeric(avgNearTransspring),
-                              avgNearTranssummer = as.numeric(avgNearTranssummer))
+# functionalize getting stuff from an .nc file
+GetUpwelling.nc <- function(path,
+                            #variable,
+                            esm
+){
+  # uses library(ncdf4)
+  # ncBEUTI <- nc_open(path)
+  # # Extract the spatiotemporal variables
+  # lat <- ncvar_get(ncBEUTI, "latitude")
+  # tim <- ncvar_get(ncBEUTI, "time")
+  # # Get the SDM predictions
+  # beutiGFDL <- ncvar_get(ncBEUTI, variable)
+  # # Close the netcdf
+  # nc_close(ncBEUTI)
+  # 
+  # # Reshape the 3D array so we can map it, change the time field to be date
+  # dimnames(beutiGFDL) <- list(lat = lat, time = tim)
+  # beutiGFDL <- reshape2::melt(beutiGFDL, value.name = variable)
+  # beutiGFDL$dt <- as.Date("1970-01-01") + days(beutiGFDL$time)
+  # beutiGFDL <- beutiGFDL %>% mutate(year = year(dt),
+  #                                   month = month(dt),
+  #                                   ESM = esm)
+  
+  # Use library(tidync)
+  ncObj <- tidync(path)
+  varTbl <- ncObj %>% hyper_tibble()
+  timeTbl <- ncObj %>% activate("D0") %>% hyper_tibble()
+  
+  varTbl <- varTbl %>% full_join(y = timeTbl, by = "time") %>%
+              mutate(ESM = esm)
+  
+  return(varTbl)
+}
+
+beutiGFDL <- GetUpwelling.nc(path = paste0(datPath, "beuti_gfdl_monthly_1980-2100.nc"),
+                             # variable = "BEUTI", 
+                             esm = "GFDL")
+# beutiGFDL <- tidync(paste0(datPath, "beuti_gfdl_monthly_1980-2100.nc"))
+# beutiGFDL %>% hyper_tibble()
+# beutiGFDL %>% activate("D0") %>% hyper_tibble()
+
+beutiHAD <- GetUpwelling.nc(path = paste0(datPath, "beuti_had_monthly_1980-2100.nc"),
+                             # variable = "BEUTI", 
+                            esm = "HAD")
+beutiIPSL <- GetUpwelling.nc(path = paste0(datPath, "beuti_ipsl_monthly_1980-2100.nc"),
+                             # variable = "BEUTI", 
+                             esm = "IPSL")
+  
+upwelling <- rbind(beutiGFDL, beutiHAD, beutiIPSL)
+
+cutiGFDL <- GetUpwelling.nc(path = paste0(datPath, "cuti_gfdl_monthly_1980-2100.nc"),
+                             # variable = "CUTI", 
+                            esm = "GFDL")
+cutiHAD <- GetUpwelling.nc(path = paste0(datPath, "cuti_had_monthly_1980-2100.nc"),
+                           # variable = "CUTI", 
+                           esm = "HAD")
+cutiIPSL <- GetUpwelling.nc(path = paste0(datPath, "cuti_ipsl_monthly_1980-2100.nc"),
+                            # variable = "CUTI", 
+                            esm = "IPSL")
+
+upwelling <- upwelling %>% full_join(y = rbind(cutiGFDL, cutiHAD, cutiIPSL),
+                                     by = c("latitude", "time", "year", "month", "ESM"))
+
+# STI and LUSI
+# ncPhen <- nc_open(paste0(datPath, "cuti_phenology_gfdl_1980-2100.nc"))
+# # Extract the spatiotemporal variables
+# lat <- ncvar_get(ncPhen, "latitude")
+# tim <- ncvar_get(ncPhen, "time")
+# # Get the SDM predictions
+# stiGFDL <- ncvar_get(ncPhen, "STI")
+# lusiGFDL <- ncvar_get(ncPhen, "LUSI")
+# # Close the netcdf
+# nc_close(ncPhen)
+# 
+# # Reshape the 3D array so we can map it, change the time field to be date
+# dimnames(stiGFDL) <- list(lat = lat)#, time = tim)
+# stiGFDL <- reshape2::melt(stiGFDL, value.name = "STI")
+# dimnames(lusiGFDL) <- list(lat = lat)#, time = tim)
+# lusiGFDL <- reshape2::melt(lusiGFDL, value.name = "LUSI")
+# # beutiGFDL$dt <- as.Date("1970-01-01") + days(beutiGFDL$time) !RW: not in date format
+# phenolGFDL <- stiGFDL %>% full_join(y = lusiGFDL, by = c("lat", "Var2")) %>%
+#                 mutate(#year = year(dt),
+#                        #month = month(dt),
+#                        ESM = "GFDL")
+
+
+# gfdlPhen <- tidync(paste0(datPath, "cuti_phenology_gfdl_1980-2100.nc"))
+# varTbl <- gfdlPhen %>% hyper_tibble()
+# timeTbl <- gfdlPhen %>% activate("D0") %>% hyper_tibble()
+# varTbl <- varTbl %>% full_join(y = timeTbl, by = "time") %>%
+#   mutate(ESM = esm)
+
+gfdlPhen <- GetUpwelling.nc(path = paste0(datPath, "cuti_phenology_gfdl_1980-2100.nc"),
+                            esm = "GFDL")
+ipslPhen <- GetUpwelling.nc(path = paste0(datPath, "cuti_phenology_ipsl_1980-2100.nc"),
+                            esm = "IPSL")
+hadPhen <- GetUpwelling.nc(path = paste0(datPath, "cuti_phenology_had_1980-2100.nc"),
+                            esm = "HAD")
+
+# ncPhen <- nc_open(paste0(datPath, "cuti_phenology_ipsl_1980-2100.nc"))
+# # Extract the spatiotemporal variables
+# lat <- ncvar_get(ncPhen, "latitude")
+# yr <- ncvar_get(ncPhen, "year")
+# # Get the SDM predictions
+# stiIPSL <- ncvar_get(ncPhen, "STI")
+# lusiIPSL <- ncvar_get(ncPhen, "LUSI")
+# # Close the netcdf
+# nc_close(ncPhen)
+# 
+# # Reshape the 3D array so we can map it, change the time field to be date
+# dimnames(stiIPSL) <- list(lat = lat)#, time = tim)
+# stiIPSL <- reshape2::melt(stiIPSL, value.name = "STI")
+# dimnames(lusiIPSL) <- list(lat = lat)#, time = tim)
+# lusiIPSL <- reshape2::melt(lusiIPSL, value.name = "LUSI")
+# dimnames(yr) <- list(lat = lat)#, time = tim)
+# lusiIPSL <- reshape2::melt(lusiIPSL, value.name = "LUSI")
+# # beutiGFDL$dt <- as.Date("1970-01-01") + days(beutiGFDL$time) !RW: not in date format
+# phenolIPSL <- stiIPSL %>% full_join(y = lusiIPSL, by = c("lat", "Var2")) %>%
+#                 mutate(#year = year(dt),
+#                        #month = month(dt),
+#                        ESM = "IPSL")
+# 
+# ncPhen <- nc_open(paste0(datPath, "cuti_phenology_had_1980-2100.nc"))
+# # Extract the spatiotemporal variables
+# lat <- ncvar_get(ncPhen, "latitude")
+# tim <- ncvar_get(ncPhen, "time")
+# # Get the SDM predictions
+# stiHAD <- ncvar_get(ncPhen, "STI")
+# lusiHAD <- ncvar_get(ncPhen, "LUSI")
+# # Close the netcdf
+# nc_close(ncPhen)
+# 
+# # Reshape the 3D array so we can map it, change the time field to be date
+# dimnames(stiHAD) <- list(lat = lat)#, time = tim)
+# stiHAD <- reshape2::melt(stiHAD, value.name = "STI")
+# dimnames(lusiHAD) <- list(lat = lat)#, time = tim)
+# lusiHAD <- reshape2::melt(lusiHAD, value.name = "LUSI")
+# # beutiGFDL$dt <- as.Date("1970-01-01") + days(beutiGFDL$time) !RW: not in date format
+# phenolHAD <- stiHAD %>% full_join(y = lusiHAD, by = c("lat", "Var2")) %>%
+#                 mutate(#year = year(dt),
+#                        #month = month(dt),
+#                        ESM = "HAD")
+
+upwelling <- upwelling %>% # need to aggregate to season first
+                filter(latitude %in% c(33, 39), month %in% 5:7) %>%
+                group_by(latitude, year, ESM) %>%
+                summarize(BEUTI = mean(BEUTI),
+                          CUTI = mean(CUTI))
+ 
+
+
+  
+upwelling <- upwelling %>% full_join(y = rbind(gfdlPhen, ipslPhen, hadPhen),
+                                     by = c("latitude", "ESM", "year")) %>%
+                filter(latitude %in% c(33, 36, 39)) %>% 
+                pivot_wider(id_cols = c(year, ESM), names_from = latitude, 
+                            values_from = c(BEUTI, CUTI, STI, LUSI))
+
+# HCI ---------------------------------------------------------------------
+hci <- read_csv(paste0(datPath, "HCI_rolling_fixed.csv"))
+
+hci <- hci %>% filter(month %in% 2:7) %>% 
+          group_by(region, year, projection) %>%
+          summarize(HCI = mean(hci.rolling)) %>%
+          rename(ESM = projection) %>%
+          mutate(ESM = toupper(ESM),
+                 region = sub(pattern = "egion ", replacement = "", x = region)) %>%
+          pivot_wider(id_cols = c(year, ESM), names_from = region, 
+                      names_prefix = "HCI_", values_from = HCI)
+
+# Join together and calculate zscores 
+
+# some rearranging for joining data
+nurseTS <- nurseTS %>% pivot_longer(cols = -year, names_to = c("spp", "ESM"), names_sep = "_") %>%
+              pivot_wider(id_cols = c(year, ESM), names_from = spp, values_from = value)
+spawnTS <- spawnTS %>% pivot_longer(cols = -year, names_to = c("spp", "ESM"), names_sep = "_") %>%
+              pivot_wider(id_cols = c(year, ESM), names_from = spp, values_from = value)
+
+projDat <- sstProj %>% full_join(y= transport, by = c("year", "ESM")) %>%
+              full_join(y= nemuroZ, by = c("year", "ESM")) %>%
+              full_join(y = upwelling, by = c("year", "ESM")) %>%
+              full_join(y = hci, by = c("year", "ESM")) %>%
+              full_join(y = nurseTS, by = c("year", "ESM")) %>%
+              full_join(y = spawnTS, by = c("year", "ESM")) %>%
+              full_join(sardSpawnDays, by = c("year", "ESM")) %>%
+              full_join(anchSpawnDays, by = c("year", "ESM")) 
+
+projDat <- projDat %>% mutate(avgNearTransspring = as.numeric(avgNearshTransp_spring),
+                              avgNearTranssummer = as.numeric(avgNearshTransp_summer),
+                              avgOffTransspring = as.numeric(avgOffshTransp_spring),
+                              avgOffTranssummer = as.numeric(avgOffshTransp_summer))
 
 # read training dataset
 datDFA <- read_csv("C:/Users/r.wildermuth/Documents/FutureSeas/RecruitmentIndex/recrmntDFA/recrDFAdat.csv")
@@ -453,22 +751,18 @@ projDat <- projDat %>% pivot_longer(-c(year, ESM), names_to = "var", values_to =
   pivot_wider(names_from = var, values_from = scaled)
 
 # add other empty variables
-projDat[c("HCI", "NCOPspring", "NCOPsummer", "SCOPspring", "SCOPsummer", 
-          "BEUTI_33N", "BEUTI_39N", "CUTI_33N", "CUTI_39N", "OC_LUSI_33N", 
-          "OC_LUSI_36N", "OC_LUSI_39N", "OC_STI_33N", "OC_STI_36N", "OC_STI_39N", 
+projDat[c("NCOPspring", "NCOPsummer", "SCOPspring", "SCOPsummer",  
           "swfscRockfishSurv_Myctophids", "avgSSWIspring", "avgSSWIsummer", 
           "sardLarv", "anchLarv", "mesopelLarv", "anchYoY", "age1SprSardmeanWAA", 
-          "meanSSBwt", "copBio", "naupBio", "sardSpawnHab", "anchSpawnHab", 
-          "daysAbove5pct", "daysAbove40pct", "sardNurseHab", "anchNurseHab", 
-          "anchRec", "sardRec", #"avgNearTransspring", "avgNearTranssummer", 
-          "avgOffTransspring", "avgOffTranssummer", "albacore", "hake")] <- NA
+          "meanSSBwt", "copBio", "naupBio", 
+          "anchRec", "sardRec", "albacore", "hake")] <- NA
 
 # select variables in same order as provided to model
 projDat <- projDat %>% filter(year >= 2020) %>% 
-  select(year, ESM, "HCI", "NCOPspring", "NCOPsummer", "SCOPspring",
-         "SCOPsummer", "BEUTI_33N", "BEUTI_39N", "CUTI_33N", "CUTI_39N",
-         "OC_LUSI_33N", "OC_LUSI_36N", "OC_LUSI_39N", "OC_STI_33N", 
-         "OC_STI_36N", "OC_STI_39N", "swfscRockfishSurv_Myctophids",
+  select(year, ESM, "HCI_R3", "HCI_R4", "NCOPspring", "NCOPsummer", "SCOPspring",
+         "SCOPsummer", "BEUTI_33", "BEUTI_39", "CUTI_33", "CUTI_39",
+         "LUSI_33", "LUSI_36", "LUSI_39", "STI_33", 
+         "STI_36", "STI_39", "swfscRockfishSurv_Myctophids",
          "avgSSWIspring", "avgSSWIsummer", "sardLarv", "anchLarv",
          "mesopelLarv", "anchYoY", "age1SprSardmeanWAA", "meanSSBwt",
          "copBio", "naupBio", "ZM_NorCal", "ZM_SoCal", "sardSpawnHab",
