@@ -722,18 +722,26 @@ datDFA <- read_csv("C:/Users/r.wildermuth/Documents/FutureSeas/RecruitmentIndex/
 # select only projectable variables 
 allDat <- datDFA %>% filter(year %in% 1980:2019) %>%
             select(year, springSST, summerSST, avgNearTransspring, avgNearTranssummer,
-                   avgOffTransspring, avgOffTranssummer, ZM_NorCal, ZM_SoCal)
+                   avgOffTransspring, avgOffTranssummer, ZM_NorCal, ZM_SoCal,
+                   HCI_R3, HCI_R4, BEUTI_33N, BEUTI_39N, CUTI_33N, CUTI_39N,
+                   OC_LUSI_33N, OC_LUSI_36N, OC_LUSI_39N, OC_STI_33N, OC_STI_36N, 
+                   OC_STI_39N, sardSpawnHab, anchSpawnHab, daysAbove5pct, 
+                   daysAbove40pct, sardNurseHab, anchNurseHab)
 
 # check mean and sd in historical period are same
 allDat %>% pivot_longer(-year, names_to = "var", values_to = "vals") %>%
   group_by(var) %>%
   summarize(histMean = mean(vals, na.rm = TRUE),
             histSD = sd(vals, na.rm = TRUE))
-projHistSmry <- projDat %>% pivot_longer(-c(year, ESM), names_to = "var", values_to = "vals") %>%
-                  filter(year < 2020,
-                         var %in% c("springSST", "summerSST", "avgNearTransspring", 
-                                    "avgNearTranssummer", "avgOffTransspring", 
-                                    "avgOffTranssummer", "ZM_NorCal", "ZM_SoCal")) %>%
+
+projHistSmry <- projDat %>% select(year, ESM, springSST, summerSST, avgNearTransspring, avgNearTranssummer,
+                                   avgOffTransspring, avgOffTranssummer, ZM_NorCal, ZM_SoCal,
+                                   HCI_R3, HCI_R4, BEUTI_33, BEUTI_39, CUTI_33, CUTI_39,
+                                   LUSI_33, LUSI_36, LUSI_39, STI_33, STI_36, 
+                                   STI_39, sardSpawnHab, anchSpawnHab, daysAbove5pct, 
+                                   daysAbove40pct, sardNurseHab, anchNurseHab) %>%
+                  pivot_longer(-c(year, ESM), names_to = "var", values_to = "vals") %>%
+                  filter(year < 2020) %>%
                   group_by(var, ESM) %>%
                   summarize(histMean = mean(vals, na.rm = TRUE),
                             histSD = sd(vals, na.rm = TRUE))
@@ -741,10 +749,13 @@ projHistSmry <- projDat %>% pivot_longer(-c(year, ESM), names_to = "var", values
 ##      Do we need to bias correct?
 
 # For now, zscore using mean of historical period from projection set
-projDat <- projDat %>% pivot_longer(-c(year, ESM), names_to = "var", values_to = "vals") %>%
-  filter(var %in% c("springSST", "summerSST", "avgNearTransspring", 
-                    "avgNearTranssummer", "avgOffTransspring", 
-                    "avgOffTranssummer", "ZM_NorCal", "ZM_SoCal")) %>%
+projDat <- projDat %>% select(year, ESM, springSST, summerSST, avgNearTransspring, avgNearTranssummer,
+                              avgOffTransspring, avgOffTranssummer, ZM_NorCal, ZM_SoCal,
+                              HCI_R3, HCI_R4, BEUTI_33, BEUTI_39, CUTI_33, CUTI_39,
+                              LUSI_33, LUSI_36, LUSI_39, STI_33, STI_36, 
+                              STI_39, sardSpawnHab, anchSpawnHab, daysAbove5pct, 
+                              daysAbove40pct, sardNurseHab, anchNurseHab) %>%
+  pivot_longer(-c(year, ESM), names_to = "var", values_to = "vals") %>%
   full_join(y = projHistSmry, by = c("var", "ESM")) %>%
   mutate(scaled = (vals - histMean)/histSD) %>%
   select(year, ESM, var, scaled) %>%
