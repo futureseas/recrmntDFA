@@ -28,14 +28,22 @@ LFOXV <- function(dfaDat, # data matrix formatted for MARSS input (variables in 
     }
     
     # calculate RMSE
-    resids <- residuals(peelDFA, type = "tT") %>% filter(name == "model")
+    # resids <- residuals(peelDFA, type = "tT") %>% filter(name == "model") # smoothation resids (Y|data from 1:T)
+    resids <- residuals(peelDFA, type = "tt1") %>% filter(name == "model") # innovation resids (Y|data from 1:(t-1)) - one-step-ahead resids
     
-    peelRMSE <- resids %>% group_by(.rownames) %>% 
-                  summarize(sosRes = sum(.resids^2, na.rm = TRUE),
+    peelRMSE <- resids %>% 
+                  # Calc RMSE over all time points
+                  # group_by(.rownames) %>% 
+                  # summarize(sosRes = sum(.resids^2, na.rm = TRUE),
+                  #           nObs = n() - sum(is.na(value))) %>%
+                  # mutate(RMSE = sqrt(sosRes/nObs)) %>% arrange(RMSE) %>%
+                  # only use most recent time for one-step-ahead RMSE
+                  filter(.rownames %in% colsRMSE, t == max(t)) %>%
+                  # summarize(totRMSE = sum(RMSE))
+                  summarize(sumRMSE = sum(.resids), # = sum of individual RMSEs for one year
+                            sosRes = sum(.resids^2, na.rm = TRUE),
                             nObs = n() - sum(is.na(value))) %>%
-                  mutate(RMSE = sqrt(sosRes/nObs)) %>% arrange(RMSE) %>%
-                  filter(.rownames %in% colsRMSE) %>%
-                  summarize(totRMSE = sum(RMSE))
+                  mutate(totRMSE = sqrt(sosRes/nObs))
     
     LFOIC <- LFOIC + peelRMSE$totRMSE
   }
