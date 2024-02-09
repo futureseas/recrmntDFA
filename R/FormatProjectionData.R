@@ -68,7 +68,7 @@ CalcAnnualHab <- function(sdmFiles, # character vector of filepaths to SDM outpu
   sardSpawnYr <- aperm(sardSpawnYr, c(2,3,1))
   sardSpawnYr[sardSpawnYr == 0] <- NA
   
-  sardSpawnHab <- aggregate(sardSpawnYr, ccAtl, FUN = sum, na.rm = TRUE)
+  sardSpawnHab <- aggregate(sardSpawnYr, shp, FUN = sum, na.rm = TRUE)
   
   if(dailyHab){
     return(list(sardSpawnHab, sardSpawn))

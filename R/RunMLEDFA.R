@@ -656,22 +656,33 @@ d$lo <- qnorm(alpha / 2) * d$.sigma + d$.fitted
 
 # combine trend states with variables for plotting with model fits
 ts.trends <- data.frame(trendStates = ts.trends,
-                        t = 1980:2019)
+                        t = 1990:2019)
+
+# read projection dataset
+projDat <- read_csv("C:/Users/r.wildermuth/Documents/FutureSeas/RecruitmentIndex/DFA_data/formattedDFAprojDat.csv")
+
+# example of projection of main drivers of sardine recruitment
+exProjGFDL <- projDat %>% filter(ESM == "GFDL") %>% 
+                select(year, HCI_R4, avgNearTransspring, springSST) %>%
+                pivot_longer(cols = -year, names_to = ".rownames", values_to = "value") %>%
+                rename(t = year)
 
 d %>% filter(name=="model",
-             # .rownames %in% c("NPGO", "anchSpawnHab",
-             #                  "SCOPsummer", "sprCalCOFISouthernMesopels",
-             #                  "anchRec", "sprCalCOFILarvalAnchovy")) %>%
-             .rownames %in% c("sardRec", "anchRec", "sardLarv", "anchLarv")) %>%
-  mutate(t = t+1979) %>%
+             .rownames %in% c("HCI_R4", "avgNearTransspring",
+                              "springSST", "sardRec")) %>%
+             # .rownames %in% c("sardRec", "anchRec", "sardLarv", "anchLarv")) %>%
+  mutate(t = t+1989) %>%
   full_join(y = ts.trends, by = "t") %>%
+  bind_rows(exProjGFDL) %>%
+  mutate(.rownames = factor(.rownames, levels = c("HCI_R4", "avgNearTransspring",
+                                                  "springSST", "sardRec"))) %>%
   ggplot(aes(x = t)) + 
   geom_point(aes(y = value)) + 
   geom_ribbon(aes(ymin = lo, ymax = up), linetype = 2, alpha = 0.2) + 
   geom_line(aes(y = .fitted), col="blue") + 
   # geom_line(aes(y = trendStates), col = "darkgreen") +
   facet_wrap(~.rownames, ncol = 1) + xlab("Year") + ylab("Variable Anomaly") +
-  theme_minimal() +
+  theme_classic() +
   theme(axis.text = element_text(size = 15),
         axis.title = element_text(size = 20))
 

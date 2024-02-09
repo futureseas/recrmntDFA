@@ -147,20 +147,20 @@ for(y in c(#1980, 1985,
     #            xvModSel$mTrends == m &
     #            xvModSel$Rstructure == "diag & unequal", "LFOIC"] <- itUneqRMSE
     
-    cat("\n Custom R matrix")
-    
-    itCustRMSE <- LFOXV(dfaDat = itDat, 
-                      Rstructure = Rcustom, 
-                      mTrends = m, 
-                      peels = peels)
-    
-    xvModSel[xvModSel$initYr == y &
-               xvModSel$mTrends == m &
-               xvModSel$Rstructure == "Rcustom", "LFOIC"] <- itCustRMSE
+    # cat("\n Custom R matrix")
+    # 
+    # itCustRMSE <- LFOXV(dfaDat = itDat, 
+    #                   Rstructure = Rcustom, 
+    #                   mTrends = m, 
+    #                   peels = peels)
+    # 
+    # xvModSel[xvModSel$initYr == y &
+    #            xvModSel$mTrends == m &
+    #            xvModSel$Rstructure == "Rcustom", "LFOIC"] <- itCustRMSE
   }
 }
  
   
-write_csv(xvModSel, file = "histProjectionModelSelection.csv")
+# write_csv(xvModSel, file = "histProjectionModelSelection.csv")
 
 
