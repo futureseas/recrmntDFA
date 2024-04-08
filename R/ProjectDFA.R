@@ -16,7 +16,15 @@ load(file = "marssFit_1980to2019_ProjDFA_4trend_Rcustom.RData")
 # transpose for MARSS formatting
 projDatIPSL <- projDat %>% filter(ESM == "IPSL") %>%
                   select(-year, -ESM) %>%
-                  select(rownames(projectDFA$model$data)) %>%
+                  select(c("BEUTI_33", "BEUTI_39", "CUTI_33", "CUTI_39", 
+                           "LUSI_33", "LUSI_36", "LUSI_39", "STI_33", 
+                           "STI_36", "STI_39", "avgSSWIspring", "avgSSWIsummer", 
+                           "sardLarv", "anchLarv", "anchYoY", "ZM_NorCal",
+                           "ZM_SoCal", "sardSpawnHab", "anchSpawnHab", 
+                           "daysAbove5pct", "daysAbove40pct", "sardNurseHab", 
+                           "anchNurseHab", "anchRec", "sardRec", "springSST", 
+                           "summerSST", "avgNearTransspring", "avgNearTranssummer",
+                           "avgOffTransspring", "avgOffTranssummer")) %>%
                   t()
 
 # Testing what predict() does for estimating latent states
@@ -25,13 +33,13 @@ projDatIPSL <- projDat %>% filter(ESM == "IPSL") %>%
 # testProj[which(datNames %in% c("HCI", "anchRec")), ] <- 0 # sets most precise, highest loading variable to mean
 # testProj[which(datNames %in% c("meanSSBwt", "naupBio")), ] <- 0 # sets least precise, lowest loading variable to mean
 
-forecastIPSL <- predict(object = projectDFA,
+forecastIPSL <- forecast(object = projectDFA,
                         # n.ahead = 81, # alone, this sets value of X as last state of fitted model
                         # newdata = list(t = 41:121,
                         #                y = testProj),
-                        newdata = list(t = 41:121,
-                                       y = projDatIPSL), # data are zscored in FormatProjectionData.R
-                        x0 = "use.model",
+                        newdata = list(y = projDatIPSL), # data are zscored in FormatProjectionData.R
+                        h = 81,
+                        interval = "none",
                         type = "ytt")
                         # type = "xtT") #
                       # RW!: do we want projections with full knowledge (ytT), or just to "present" (ytt)?
@@ -39,28 +47,49 @@ plot(forecastIPSL)
 
 
 projDatGFDL <- projDat %>% filter(ESM == "GFDL") %>%
-  select(-year, -ESM) %>% t()
+                  select(-year, -ESM) %>%
+                  select(c("BEUTI_33", "BEUTI_39", "CUTI_33", "CUTI_39", 
+                           "LUSI_33", "LUSI_36", "LUSI_39", "STI_33", 
+                           "STI_36", "STI_39", "avgSSWIspring", "avgSSWIsummer", 
+                           "sardLarv", "anchLarv", "anchYoY", "ZM_NorCal",
+                           "ZM_SoCal", "sardSpawnHab", "anchSpawnHab", 
+                           "daysAbove5pct", "daysAbove40pct", "sardNurseHab", 
+                           "anchNurseHab", "anchRec", "sardRec", "springSST", 
+                           "summerSST", "avgNearTransspring", "avgNearTranssummer",
+                           "avgOffTransspring", "avgOffTranssummer")) %>% t()
 
-forecastGFDL <- predict(object = overallDFA,
-                        newdata = list(t = 41:121,
-                                       y = projDatGFDL), # data are zscored in FormatProjectionData.R
-                        x0 = "use.model",
-                        type = "ytt")# type = "xtT") #
+forecastGFDL <- forecast(object = projectDFA,
+                        newdata = list(y = projDatGFDL), # data are zscored in FormatProjectionData.R
+                        h = 81,
+                        interval = "confidence",
+                        type = "ytt")
 plot(forecastGFDL)
 
 
 projDatHAD <- projDat %>% filter(ESM == "HAD") %>%
-  select(-year, -ESM) %>% t()
+                select(-year, -ESM) %>% 
+                select(c("BEUTI_33", "BEUTI_39", "CUTI_33", "CUTI_39", 
+                         "LUSI_33", "LUSI_36", "LUSI_39", "STI_33", 
+                         "STI_36", "STI_39", "avgSSWIspring", "avgSSWIsummer", 
+                         "sardLarv", "anchLarv", "anchYoY", "ZM_NorCal",
+                         "ZM_SoCal", "sardSpawnHab", "anchSpawnHab", 
+                         "daysAbove5pct", "daysAbove40pct", "sardNurseHab", 
+                         "anchNurseHab", "anchRec", "sardRec", "springSST", 
+                         "summerSST", "avgNearTransspring", "avgNearTranssummer",
+                         "avgOffTransspring", "avgOffTranssummer")) %>% t()
 
-forecastHAD <- predict(object = overallDFA,
-                        newdata = list(t = 41:121,
-                                       y = projDatHAD), # data are zscored in FormatProjectionData.R
-                        x0 = "use.model",
-                        type = "ytt")# type = "xtT") #
+forecastHAD <- forecast(object = projectDFA,
+                       newdata = list(y = projDatHAD), # data are zscored in FormatProjectionData.R
+                       h = 81,
+                       interval = "none",
+                       type = "ytt")
 plot(forecastHAD)
 
-forecastHAD$pred %>% filter(!is.na(y)) %>%
+# forecastHAD
+# forecastGFDL
+forecastIPSL$pred %>% #filter(!is.na(y)) %>%
   ggplot(aes(x = t)) +
+  geom_vline(xintercept = 40, color = "grey") +
   geom_point(aes(y = y), color = "darkblue") +
   geom_line(aes(y = estimate), linewidth = 1) +
   geom_hline(yintercept = 0) +
