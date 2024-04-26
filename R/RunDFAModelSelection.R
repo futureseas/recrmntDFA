@@ -4,6 +4,7 @@
 library(tidyverse)
 library(MARSS)
 source("R/LFOXV.R")
+source("R/OSAResids.R")
 
 # read prepped dataset
 datDFA <- read_csv("C:/Users/r.wildermuth/Documents/FutureSeas/RecruitmentIndex/recrmntDFA/recrDFAdat.csv")
@@ -103,17 +104,13 @@ diag(Rcustom) <- c("HCI", "HCI",
                    "RREAS")
 
 # Set up table of model structures to hold LFOIC vals
-xvModSel <- expand_grid(initYr = c(#1980, 1985, 
-                                   1990), 
-                        Rstructure = c("Rcustom", "diag & equal"), 
-                        mTrends = 3:6) %>%
-              mutate(nIndices = length(datNames),
-                     peels = peels,
-                     LFOIC = NA)
+xvModSel <- tibble(initYr = 0, 
+                   Rstructure = "", 
+                   mTrends = 0)[0,]
 
 # loop over initial dates
-for(y in c(#1980, 1985, 
-           1990)){
+for(y in c(1980, 1985, #1990,
+           1995)){
   cat("\n")
   print(y)
   
@@ -124,7 +121,7 @@ for(y in c(#1980, 1985,
   itDat <- initDat %>% select(-year) %>% t()
   
   # loop over number of trends
-  for(m in 3:6){
+  for(m in 1:8){
     cat("\n Trends: ", m)
     cat("\n Diagonal and equal R matrix")
     itEqRMSE <- LFOXV(dfaDat = itDat, 
@@ -132,9 +129,9 @@ for(y in c(#1980, 1985,
                        mTrends = m, 
                        peels = peels)
     
-    xvModSel[xvModSel$initYr == y &
-               xvModSel$mTrends == m &
-               xvModSel$Rstructure == "diag & equal", "LFOIC"] <- itEqRMSE
+    itEqRMSE <- itEqRMSE %>% mutate(initYr = y,
+                                    mTrends = m,
+                                    Rstructure = "diag & equal")
     
     # cat("\n Diagonal and unequal R matrix")
     # 
@@ -150,17 +147,21 @@ for(y in c(#1980, 1985,
     cat("\n Custom R matrix")
 
     itCustRMSE <- LFOXV(dfaDat = itDat,
-                      Rstructure = Rcustom,
-                      mTrends = m,
-                      peels = peels)
+                        Rstructure = Rcustom,
+                        mTrends = m,
+                        peels = peels)
 
-    xvModSel[xvModSel$initYr == y &
-               xvModSel$mTrends == m &
-               xvModSel$Rstructure == "Rcustom", "LFOIC"] <- itCustRMSE
-  }
-}
- 
+    itCustRMSE <- itCustRMSE %>% mutate(initYr = y,
+                                    mTrends = m,
+                                    Rstructure = "custom R")
+    
+    xvModSel <- xvModSel %>% bind_rows(itCustRMSE, itEqRMSE)
+  } # end trends loop
+} # end year loop 
+
+xvModSel <- xvModSel %>% mutate(nIndices = length(datNames),
+                                peels = peels)
   
-# write_csv(xvModSel, file = "histProjectionModelSelection.csv")
+write_csv(xvModSel, file = "histProjectionModelSelection1980to1995.csv")
 
 
