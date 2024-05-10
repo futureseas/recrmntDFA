@@ -525,16 +525,26 @@ projectDFA <- MARSS(y = projDat,
                     #                allow.degen = TRUE),
                     inits = list(x0 = matrix(1, 1, 1)),
                     z.score = TRUE,
-                    model = list(R = "diagonal and equal", # observation errors are the same
+                    model = list(#R = "diagonal and equal", # observation errors are the same
                       # R = "diagonal and unequal", # observation errors independent
                       # R = "equalvarcov", # observation errors equal and covars equal
                       # R = "unconstrained", # all observation errors independent
-                      # R = RcustProj,
-                      m = 7) # number of latent processes
+                      R = RcustProj,
+                      m = 5) # number of latent processes
 )
 
-# save(projectDFA, file = "marssFit_1980to2019_ProjDFA_3trend_Rcustom.RData")
-# save(projectDFA, file = "marssFit_1980to2019_ProjDFA_4trend_Rcustom.RData")
+# save(projectDFA, file = "marssFit_1990to2019_ProjDFA_5trend_Rcustom.RData")
+
+# calc RMSE
+projRMSE <- residuals(projectDFA, type = "tT")
+
+projRMSE <- projRMSE %>% filter(name == "model") %>%
+              group_by(.rownames) %>%
+              summarize(sosRes = sum(.resids^2, na.rm = TRUE),
+                        nObs = sum(!is.na(.resids))) %>%
+              mutate(RMSE = sqrt(sosRes/nObs))
+projRMSE %>% filter(.rownames %in% c("anchYoY", "anchRec", "sardRec")) %>%
+  summarize(totRMSE = sum(RMSE))
 
 # Look at factor loadings
 # get the inverse of the rotation matrix 

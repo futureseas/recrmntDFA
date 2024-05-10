@@ -15,93 +15,93 @@ peels <- 10
 
 # LFOIC for full historical dataset ---------------------------------------
 
+# remove contemporary adult biomass with recruits, should be S2 biomass -> S1 recs
+allDat <- datDFA%>% select(-c(NOI,
+                              ENSO,
+                              NPGO,
+                              #All_Copepods, # ~same as calanoid copepods
+                              #euphausiids, # too large for larval mouth gape
+                              anchBioSmrySeas1,
+                              sardBioSmrySeas1,
+                              anchBioSmrySeas2, # leave out biomass since not fit well
+                              sardBioSmrySeas2,
+                              # NCOPspring,
+                              # SCOPspring, # summer copepod index had higher loadings
+                              PDOsummer, # lower loading than spring, may want to try a lag
+                              PDOspring,
+                              NCOPsummer,
+                              SCOPsummer,
+                              # BEUTI_33N, # oceanography at 39N had highest loadings
+                              # OC_LUSI_33N,
+                              # OC_LUSI_36N,
+                              # OC_STI_33N,
+                              # OC_STI_36N,
+                              copMeanSize,
+                              copPropBioSize,
+                              naupMeanSize,
+                              naupPropBioSize,
+                              ZL_NorCal,
+                              ZL_SoCal,
+                              age1SprAnchmeanWAA)) # not enough data in time windowselect(-c(#sprCalCOFILarvalSardine,
+
+datNames <- names(allDat)[-1]
+
+# Create a custom R obs error matrix assuming each data source has it's own common error
+Rcustom <- matrix(list(0),length(datNames),length(datNames))
+diag(Rcustom) <- c("HCI", "HCI",
+                   "COP", "COP", "COP", "COP",
+                   "BEUTI", "BEUTI",
+                   "CUTI", "CUTI",
+                   "LUSI", "LUSI", "LUSI",
+                   "STI", "STI", "STI",
+                   "RREAS",
+                   "SSWI", "SSWI",
+                   "CalCOFI", "CalCOFI", "CalCOFI",
+                   "RREAS",
+                   "WAA", "WAA",
+                   "PRPOOS", "PRPOOS", #"PRPOOS", "PRPOOS", "PRPOOS", #"PRPOOS", "PRPOOS",
+                   "NEMURO", "NEMURO",
+                   "SDM", "SDM", "TIME", "TIME", "SDM", "SDM",
+                   "anchRec",
+                   "sardRec",
+                   # "anchBio",
+                   # "sardBio",
+                   "SST", "SST",
+                   "Transp", "Transp", "Transp", "Transp",
+                   "Alb", "Hake")
+
+# LFOIC for historical projection dataset ---------------------------------------
+
 # # remove contemporary adult biomass with recruits, should be S2 biomass -> S1 recs
-# allDat <- datDFA%>% select(-c(NOI,
-#                               ENSO,
-#                               NPGO,
-#                               #All_Copepods, # ~same as calanoid copepods
-#                               #euphausiids, # too large for larval mouth gape
-#                               anchBioSmrySeas1,
-#                               sardBioSmrySeas1,
-#                               anchBioSmrySeas2, # leave out biomass since not fit well
-#                               sardBioSmrySeas2,
-#                               # NCOPspring,
-#                               # SCOPspring, # summer copepod index had higher loadings
-#                               PDOsummer, # lower loading than spring, may want to try a lag
-#                               PDOspring,
-#                               NCOPsummer,
-#                               SCOPsummer,
-#                               # BEUTI_33N, # oceanography at 39N had highest loadings
-#                               # OC_LUSI_33N,
-#                               # OC_LUSI_36N,
-#                               # OC_STI_33N,
-#                               # OC_STI_36N,
-#                               copMeanSize,
-#                               copPropBioSize,
-#                               naupMeanSize,
-#                               naupPropBioSize,
-#                               ZL_NorCal,
-#                               ZL_SoCal,
-#                               age1SprAnchmeanWAA)) # not enough data in time windowselect(-c(#sprCalCOFILarvalSardine,
+# allDat <- datDFA%>% select(c("year", "HCI_R3", "HCI_R4", "BEUTI_33N", "BEUTI_39N", 
+#                              "CUTI_33N", "CUTI_39N",
+#                              "OC_LUSI_33N", "OC_LUSI_36N", "OC_LUSI_39N", "OC_STI_33N",
+#                              "OC_STI_36N", "OC_STI_39N", "ZM_NorCal", "ZM_SoCal",
+#                              "sardSpawnHab",
+#                              "anchSpawnHab", "daysAbove5pct", "daysAbove40pct",
+#                              "sardNurseHab", "anchNurseHab",
+#                              "springSST", "summerSST", "avgNearTransspring",
+#                              "avgNearTranssummer", "avgOffTransspring", "avgOffTranssummer",
+#                              # Variables of interest
+#                              "sardRec", "anchRec", "sardLarv", 
+#                              "anchLarv", "anchYoY")) 
 # 
 # datNames <- names(allDat)[-1]
 # 
 # # Create a custom R obs error matrix assuming each data source has it's own common error
 # Rcustom <- matrix(list(0),length(datNames),length(datNames)) 
 # diag(Rcustom) <- c("HCI", "HCI",
-#                    "COP", "COP", "COP", "COP",
 #                    "BEUTI", "BEUTI", 
 #                    "CUTI", "CUTI",
 #                    "LUSI", "LUSI", "LUSI", 
 #                    "STI", "STI", "STI",
-#                    "RREAS",
-#                    "SSWI", "SSWI",
-#                    "CalCOFI", "CalCOFI", "CalCOFI",
-#                    "RREAS",
-#                    "WAA", "WAA",
-#                    "PRPOOS", "PRPOOS", #"PRPOOS", "PRPOOS", "PRPOOS", #"PRPOOS", "PRPOOS",
 #                    "NEMURO", "NEMURO",
 #                    "SDM", "SDM", "TIME", "TIME", "SDM", "SDM",
-#                    "anchRec", 
-#                    "sardRec",
-#                    # "anchBio",
-#                    # "sardBio",
 #                    "SST", "SST",
 #                    "Transp", "Transp", "Transp", "Transp",
-#                    "Alb", "Hake")
-
-# LFOIC for historical projection dataset ---------------------------------------
-
-# remove contemporary adult biomass with recruits, should be S2 biomass -> S1 recs
-allDat <- datDFA%>% select(c("year", "HCI_R3", "HCI_R4", "BEUTI_33N", "BEUTI_39N", 
-                             "CUTI_33N", "CUTI_39N",
-                             "OC_LUSI_33N", "OC_LUSI_36N", "OC_LUSI_39N", "OC_STI_33N",
-                             "OC_STI_36N", "OC_STI_39N", "ZM_NorCal", "ZM_SoCal",
-                             "sardSpawnHab",
-                             "anchSpawnHab", "daysAbove5pct", "daysAbove40pct",
-                             "sardNurseHab", "anchNurseHab",
-                             "springSST", "summerSST", "avgNearTransspring",
-                             "avgNearTranssummer", "avgOffTransspring", "avgOffTranssummer",
-                             # Variables of interest
-                             "sardRec", "anchRec", "sardLarv", 
-                             "anchLarv", "anchYoY")) 
-
-datNames <- names(allDat)[-1]
-
-# Create a custom R obs error matrix assuming each data source has it's own common error
-Rcustom <- matrix(list(0),length(datNames),length(datNames)) 
-diag(Rcustom) <- c("HCI", "HCI",
-                   "BEUTI", "BEUTI", 
-                   "CUTI", "CUTI",
-                   "LUSI", "LUSI", "LUSI", 
-                   "STI", "STI", "STI",
-                   "NEMURO", "NEMURO",
-                   "SDM", "SDM", "TIME", "TIME", "SDM", "SDM",
-                   "SST", "SST",
-                   "Transp", "Transp", "Transp", "Transp",
-                   "sardRec", "anchRec", 
-                   "CalCOFI", "CalCOFI",
-                   "RREAS")
+#                    "sardRec", "anchRec", 
+#                    "CalCOFI", "CalCOFI",
+#                    "RREAS")
 
 # Set up table of model structures to hold LFOIC vals
 xvModSel <- tibble(initYr = 0, 
@@ -109,8 +109,8 @@ xvModSel <- tibble(initYr = 0,
                    mTrends = 0)[0,]
 
 # loop over initial dates
-for(y in c(1980, 1985, #1990,
-           1995)){
+for(y in c(#1980, 1985, 
+           1990)){
   cat("\n")
   print(y)
   
@@ -124,25 +124,25 @@ for(y in c(1980, 1985, #1990,
   for(m in 1:8){
     cat("\n Trends: ", m)
     cat("\n Diagonal and equal R matrix")
-    itEqRMSE <- LFOXV(dfaDat = itDat, 
-                       Rstructure = "diagonal and equal", 
-                       mTrends = m, 
+    itEqRMSE <- LFOXV(dfaDat = itDat,
+                       Rstructure = "diagonal and equal",
+                       mTrends = m,
                        peels = peels)
-    
+
     itEqRMSE <- itEqRMSE %>% mutate(initYr = y,
                                     mTrends = m,
                                     Rstructure = "diag & equal")
     
-    # cat("\n Diagonal and unequal R matrix")
-    # 
-    # itUneqRMSE <- LFOXV(dfaDat = itDat, 
-    #                   Rstructure = "diagonal and unequal", 
-    #                   mTrends = m, 
-    #                   peels = peels)
-    # 
-    # xvModSel[xvModSel$initYr == y &
-    #            xvModSel$mTrends == m &
-    #            xvModSel$Rstructure == "diag & unequal", "LFOIC"] <- itUneqRMSE
+    cat("\n Diagonal and unequal R matrix")
+
+    itUneqRMSE <- LFOXV(dfaDat = itDat,
+                      Rstructure = "diagonal and unequal",
+                      mTrends = m,
+                      peels = peels)
+
+    itUneqRMSE <- itUneqRMSE %>% mutate(initYr = y,
+                                    mTrends = m,
+                                    Rstructure = "diag & unequal")
     
     cat("\n Custom R matrix")
 
@@ -154,14 +154,14 @@ for(y in c(1980, 1985, #1990,
     itCustRMSE <- itCustRMSE %>% mutate(initYr = y,
                                     mTrends = m,
                                     Rstructure = "custom R")
-    
-    xvModSel <- xvModSel %>% bind_rows(itCustRMSE, itEqRMSE)
+
+    xvModSel <- xvModSel %>% bind_rows(itUneqRMSE)#itCustRMSE, itEqRMSE)
   } # end trends loop
 } # end year loop 
 
 xvModSel <- xvModSel %>% mutate(nIndices = length(datNames),
                                 peels = peels)
   
-write_csv(xvModSel, file = "histProjectionModelSelection1980to1995.csv")
+write_csv(xvModSel, file = "fullHistoricalModelSelection.csv")
 
 

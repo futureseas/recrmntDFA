@@ -10,17 +10,15 @@ projDat <- read_csv("C:/Users/r.wildermuth/Documents/FutureSeas/RecruitmentIndex
 datNames <- names(projDat)[-(1:2)]
 
 # load fitted MARSS output
-# load(file = "marssFit_1980to2019_noBio_3trend_Rcustom.RData")
-load(file = "marssFit_1980to2019_ProjDFA_4trend_Rcustom.RData")
+load(file = "marssFit_1990to2019_ProjDFA_5trend_Rcustom.RData")
 
 # transpose for MARSS formatting
 projDatIPSL <- projDat %>% filter(ESM == "IPSL") %>%
                   select(-year, -ESM) %>%
-                  select(c("BEUTI_33", "BEUTI_39", "CUTI_33", "CUTI_39", 
-                           "LUSI_33", "LUSI_36", "LUSI_39", "STI_33", 
-                           "STI_36", "STI_39", "avgSSWIspring", "avgSSWIsummer", 
-                           "sardLarv", "anchLarv", "anchYoY", "ZM_NorCal",
-                           "ZM_SoCal", "sardSpawnHab", "anchSpawnHab", 
+                  select(c("HCI_R3", "HCI_R4", "BEUTI_33", "BEUTI_39", "CUTI_33", 
+                           "CUTI_39", "LUSI_33", "LUSI_36", "LUSI_39", "STI_33", 
+                           "STI_36", "STI_39", "sardLarv", "anchLarv", "anchYoY", 
+                           "ZM_NorCal", "ZM_SoCal", "sardSpawnHab", "anchSpawnHab", 
                            "daysAbove5pct", "daysAbove40pct", "sardNurseHab", 
                            "anchNurseHab", "anchRec", "sardRec", "springSST", 
                            "summerSST", "avgNearTransspring", "avgNearTranssummer",
@@ -39,7 +37,7 @@ forecastIPSL <- forecast(object = projectDFA,
                         #                y = testProj),
                         newdata = list(y = projDatIPSL), # data are zscored in FormatProjectionData.R
                         h = 81,
-                        interval = "none",
+                        interval = "confidence",
                         type = "ytt")
                         # type = "xtT") #
                       # RW!: do we want projections with full knowledge (ytT), or just to "present" (ytt)?
@@ -48,11 +46,10 @@ plot(forecastIPSL)
 
 projDatGFDL <- projDat %>% filter(ESM == "GFDL") %>%
                   select(-year, -ESM) %>%
-                  select(c("BEUTI_33", "BEUTI_39", "CUTI_33", "CUTI_39", 
-                           "LUSI_33", "LUSI_36", "LUSI_39", "STI_33", 
-                           "STI_36", "STI_39", "avgSSWIspring", "avgSSWIsummer", 
-                           "sardLarv", "anchLarv", "anchYoY", "ZM_NorCal",
-                           "ZM_SoCal", "sardSpawnHab", "anchSpawnHab", 
+                  select(c("HCI_R3", "HCI_R4", "BEUTI_33", "BEUTI_39", "CUTI_33", 
+                           "CUTI_39", "LUSI_33", "LUSI_36", "LUSI_39", "STI_33", 
+                           "STI_36", "STI_39", "sardLarv", "anchLarv", "anchYoY", 
+                           "ZM_NorCal", "ZM_SoCal", "sardSpawnHab", "anchSpawnHab", 
                            "daysAbove5pct", "daysAbove40pct", "sardNurseHab", 
                            "anchNurseHab", "anchRec", "sardRec", "springSST", 
                            "summerSST", "avgNearTransspring", "avgNearTranssummer",
@@ -68,11 +65,10 @@ plot(forecastGFDL)
 
 projDatHAD <- projDat %>% filter(ESM == "HAD") %>%
                 select(-year, -ESM) %>% 
-                select(c("BEUTI_33", "BEUTI_39", "CUTI_33", "CUTI_39", 
-                         "LUSI_33", "LUSI_36", "LUSI_39", "STI_33", 
-                         "STI_36", "STI_39", "avgSSWIspring", "avgSSWIsummer", 
-                         "sardLarv", "anchLarv", "anchYoY", "ZM_NorCal",
-                         "ZM_SoCal", "sardSpawnHab", "anchSpawnHab", 
+                select(c("HCI_R3", "HCI_R4", "BEUTI_33", "BEUTI_39", "CUTI_33", 
+                         "CUTI_39", "LUSI_33", "LUSI_36", "LUSI_39", "STI_33", 
+                         "STI_36", "STI_39", "sardLarv", "anchLarv", "anchYoY", 
+                         "ZM_NorCal", "ZM_SoCal", "sardSpawnHab", "anchSpawnHab", 
                          "daysAbove5pct", "daysAbove40pct", "sardNurseHab", 
                          "anchNurseHab", "anchRec", "sardRec", "springSST", 
                          "summerSST", "avgNearTransspring", "avgNearTranssummer",
@@ -81,7 +77,7 @@ projDatHAD <- projDat %>% filter(ESM == "HAD") %>%
 forecastHAD <- forecast(object = projectDFA,
                        newdata = list(y = projDatHAD), # data are zscored in FormatProjectionData.R
                        h = 81,
-                       interval = "none",
+                       interval = "confidence",
                        type = "ytt")
 plot(forecastHAD)
 
@@ -89,7 +85,7 @@ plot(forecastHAD)
 # forecastGFDL
 forecastIPSL$pred %>% #filter(!is.na(y)) %>%
   ggplot(aes(x = t)) +
-  geom_vline(xintercept = 40, color = "grey") +
+  geom_vline(xintercept = 30, color = "grey") +
   geom_point(aes(y = y), color = "darkblue") +
   geom_line(aes(y = estimate), linewidth = 1) +
   geom_hline(yintercept = 0) +
@@ -104,3 +100,39 @@ forecastHAD$pred %>% filter(.rownames %in% c("sardRec", "anchRec",
   geom_hline(yintercept = 0) +
   facet_wrap(~.rownames, scales = "free_y") +
   theme_classic()
+
+
+# Plots for MS ------------------------------------------------------------
+
+# projection time series
+projTSGFDL <- forecastGFDL$pred 
+names(projTSGFDL) <- make.names(names(projTSGFDL))
+projTSGFDL %>% 
+  filter(.rownames %in% c("HCI_R3", "HCI_R4", "BEUTI_33N", "BEUTI_39N", "CUTI_33N", 
+                         "CUTI_39N", "OC_LUSI_33N", "OC_LUSI_36N", "OC_LUSI_39N",  
+                         "OC_STI_33N", "OC_STI_36N", "OC_STI_39N",  
+                         "ZM_NorCal", "ZM_SoCal", "sardSpawnHab", "anchSpawnHab", 
+                         "daysAbove5pct", "daysAbove40pct", "sardNurseHab", 
+                         "anchNurseHab",  "springSST", 
+                         "summerSST", "avgNearTransspring", "avgNearTranssummer",
+                         "avgOffTransspring", "avgOffTranssummer")) %>%
+  ggplot(aes(x = t, y = estimate)) +
+  geom_line() +
+  geom_ribbon(aes(ymin = Lo.95, ymax = Hi.95), alpha = 0.3) +
+  facet_wrap(~.rownames, scales = "free") +
+  geom_point(aes(y = y), color = "steelblue", shape = 4, size = 0.2) +
+  geom_vline(xintercept = 30.5) +
+  theme_classic() +
+  labs(title = "GFDL")
+
+projTSGFDL %>% 
+  filter(.rownames %in% c("sardLarv", "anchLarv", "anchYoY", "anchRec", "sardRec" )) %>%
+  ggplot(aes(x = t, y = estimate)) +
+  geom_line() +
+  geom_ribbon(aes(ymin = Lo.95, ymax = Hi.95), alpha = 0.3) +
+  facet_wrap(~.rownames, scales = "free") +
+  geom_point(aes(y = y), color = "steelblue", shape = 1, size = 1) +
+  geom_vline(xintercept = 30.5) +
+  theme_classic() +
+  labs(title = "GFDL")
+
