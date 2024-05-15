@@ -30,7 +30,7 @@ LFOXV <- function(dfaDat, # data matrix formatted for MARSS input (variables in 
     
     # check convergence
     if(peelDFA$convergence != 0){
-      return(-999) # default RMSE for failed convergence
+      return(-99999) # default RMSE for failed convergence
     }
     
     # get one-step-ahead residuals

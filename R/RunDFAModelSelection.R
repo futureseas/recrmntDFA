@@ -132,7 +132,7 @@ for(y in c(#1980, 1985,
     itEqRMSE <- itEqRMSE %>% mutate(initYr = y,
                                     mTrends = m,
                                     Rstructure = "diag & equal")
-    
+
     cat("\n Diagonal and unequal R matrix")
 
     itUneqRMSE <- LFOXV(dfaDat = itDat,
@@ -143,7 +143,7 @@ for(y in c(#1980, 1985,
     itUneqRMSE <- itUneqRMSE %>% mutate(initYr = y,
                                     mTrends = m,
                                     Rstructure = "diag & unequal")
-    
+
     cat("\n Custom R matrix")
 
     itCustRMSE <- LFOXV(dfaDat = itDat,
@@ -155,7 +155,8 @@ for(y in c(#1980, 1985,
                                     mTrends = m,
                                     Rstructure = "custom R")
 
-    xvModSel <- xvModSel %>% bind_rows(itUneqRMSE)#itCustRMSE, itEqRMSE)
+    xvModSel <- xvModSel %>% bind_rows(itUneqRMSE, 
+                                       itCustRMSE, itEqRMSE)
   } # end trends loop
 } # end year loop 
 
