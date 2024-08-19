@@ -39,6 +39,11 @@ forecastIPSL <- forecast(object = projectDFA,
                         h = 81,
                         interval = "confidence",
                         type = "ytt")
+fcastXsIPSL <- forecast(object = projectDFA,
+                        newdata = list(y = projDatIPSL), # data are zscored in FormatProjectionData.R
+                        h = 81,
+                        interval = "confidence",
+                        type = "xtt")
                         # type = "xtT") #
                       # RW!: do we want projections with full knowledge (ytT), or just to "present" (ytt)?
 plot(forecastIPSL)
@@ -60,6 +65,11 @@ forecastGFDL <- forecast(object = projectDFA,
                         h = 81,
                         interval = "confidence",
                         type = "ytt")
+fcastXsGFDL <- forecast(object = projectDFA,
+                        newdata = list(y = projDatGFDL), # data are zscored in FormatProjectionData.R
+                        h = 81,
+                        interval = "confidence",
+                        type = "xtt")
 plot(forecastGFDL)
 
 
@@ -79,6 +89,11 @@ forecastHAD <- forecast(object = projectDFA,
                        h = 81,
                        interval = "confidence",
                        type = "ytt")
+fcastXsHAD <- forecast(object = projectDFA,
+                       newdata = list(y = projDatHAD), # data are zscored in FormatProjectionData.R
+                       h = 81,
+                       interval = "confidence",
+                       type = "xtt")
 plot(forecastHAD)
 
 # forecastHAD
@@ -105,23 +120,34 @@ forecastHAD$pred %>% filter(.rownames %in% c("sardRec", "anchRec",
 # Plots for MS ------------------------------------------------------------
 
 # projection time series
-projTSGFDL <- forecastGFDL$pred 
+projTSGFDL <- bind_rows(forecastGFDL$pred, fcastXsGFDL$pred) %>% mutate(ESM = "GFDL")
 names(projTSGFDL) <- make.names(names(projTSGFDL))
 projTSGFDL %>% 
-  filter(.rownames %in% c("HCI_R3", "HCI_R4", "BEUTI_33N", "BEUTI_39N", "CUTI_33N", 
-                         "CUTI_39N", "OC_LUSI_33N", "OC_LUSI_36N", "OC_LUSI_39N",  
-                         "OC_STI_33N", "OC_STI_36N", "OC_STI_39N",  
-                         "ZM_NorCal", "ZM_SoCal", "sardSpawnHab", "anchSpawnHab", 
-                         "daysAbove5pct", "daysAbove40pct", "sardNurseHab", 
-                         "anchNurseHab",  "springSST", 
-                         "summerSST", "avgNearTransspring", "avgNearTranssummer",
-                         "avgOffTransspring", "avgOffTranssummer")) %>%
+  filter(.rownames %in% c("HCI_R4", "BEUTI_39N", "OC_STI_33N", 
+                         "ZM_NorCal", "anchSpawnHab", "daysAbove40pct",
+                         "springSST", "avgNearTransspring",
+                         "X2", "X3", "X4", "X5",
+                         "sardRec", "anchRec")) %>%
+  mutate(.rownames = factor(.rownames, levels = c("anchSpawnHab", "daysAbove40pct",
+                                                  "HCI_R4", "BEUTI_39N", 
+                                                  "OC_STI_33N", "avgNearTransspring",
+                                                  "springSST", "ZM_NorCal", 
+                                                  "X2", "X3", "X4", "X5",
+                                                  "anchRec", "sardRec"))) %>%
+  # filter(.rownames %in% c("HCI_R3", "HCI_R4", "BEUTI_33N", "BEUTI_39N", "CUTI_33N", 
+  #                        "CUTI_39N", "OC_LUSI_33N", "OC_LUSI_36N", "OC_LUSI_39N",  
+  #                        "OC_STI_33N", "OC_STI_36N", "OC_STI_39N",  
+  #                        "ZM_NorCal", "ZM_SoCal", "sardSpawnHab", "anchSpawnHab", 
+  #                        "daysAbove5pct", "daysAbove40pct", "sardNurseHab", 
+  #                        "anchNurseHab",  "springSST", 
+  #                        "summerSST", "avgNearTransspring", "avgNearTranssummer",
+  #                        "avgOffTransspring", "avgOffTranssummer")) %>%
   ggplot(aes(x = t, y = estimate)) +
   geom_line() +
   geom_ribbon(aes(ymin = Lo.95, ymax = Hi.95), alpha = 0.3) +
   facet_wrap(~.rownames, scales = "free") +
-  geom_point(aes(y = y), color = "steelblue", shape = 4, size = 0.2) +
-  geom_vline(xintercept = 30.5) +
+  geom_point(aes(y = y), color = "steelblue", size = 0.2) +
+  geom_vline(xintercept = 30.5) + geom_hline(yintercept = 0) +
   theme_classic() +
   labs(title = "GFDL")
 
@@ -136,3 +162,89 @@ projTSGFDL %>%
   theme_classic() +
   labs(title = "GFDL")
 
+# Histogram of states across all ESMs
+projTSIPSL <- forecastIPSL$pred %>% mutate(ESM = "IPSL")
+names(projTSIPSL) <- make.names(names(projTSIPSL))
+
+projTSHAD <- forecastHAD$pred %>% mutate(ESM = "HAD")
+names(projTSHAD) <- make.names(names(projTSHAD))
+
+allProj <- bind_rows(projTSHAD, projTSGFDL, projTSIPSL) %>% 
+            mutate(Year = t + 1989,
+                   periods = case_when(Year <= 2019 ~ "Historical",
+                                       Year <= 2039 & Year > 2019 ~ "2020-2039",
+                                       Year <= 2059 & Year > 2039 ~ "2040-2059",
+                                       Year <= 2079 & Year > 2059 ~ "2060-2079",
+                                       Year > 2079 ~ "2080-2100"),
+                   periods = factor(periods, levels = c("Historical","2020-2039",
+                                                        "2040-2059", "2060-2079", 
+                                                        "2080-2100")))
+
+allProjSmry <- allProj %>% group_by(.rownames, ESM, periods) %>%
+                  summarize(varMean = mean(estimate),
+                            varMed = median(estimate),
+                            varSD = sd(estimate)) %>% 
+                  filter(periods != "Historical")
+
+allProjSmry <- allProj %>% summarize(.by = c(.rownames, periods),
+                                      varMean = mean(estimate),
+                                      varMed = median(estimate),
+                                      varSD = sd(estimate),
+                                      ESM = "Total") %>%
+                  bind_rows(allProjSmry)
+
+histHisto <- allProj %>% filter(periods == "Historical", ESM == "GFDL") %>%
+                mutate(ESM = "Observations",
+                       val = y)
+
+projHisto <- allProj %>% filter(periods != "Historical") %>%
+                mutate(val = estimate) %>% 
+                bind_rows(histHisto)
+
+projHisto %>% 
+  filter(.rownames %in% c(#"sardLarv", "anchLarv", "anchYoY", 
+                          "anchRec", "sardRec" )) %>%
+  ggplot() + geom_vline(xintercept = 0, color = "grey") +
+  geom_histogram(aes(x = val, fill = ESM)) +
+  facet_grid(rows = vars(.rownames), cols = vars(periods)) +
+  theme_bw() +
+  geom_vline(data = allProjSmry %>% 
+                      filter(.rownames %in% c(#"sardLarv", "anchLarv", "anchYoY", 
+                                              "anchRec", "sardRec"),
+                             periods != "Historical"), 
+             aes(xintercept = varMean, color = ESM), linewidth = 0.5) +
+  xlab("Standardized Index Estimate")
+
+projProp <- allProj %>% filter(periods == "Historical") %>%
+              group_by(.rownames, ESM, periods) %>%
+              summarize(varMin = min(y, na.rm = TRUE),
+                        varMax = max(y, na.rm = TRUE),
+                        varMean = mean(y, na.rm = TRUE)) %>%
+              select(-periods) %>%
+              full_join(y = allProj, by = c(".rownames", "ESM")) %>%
+              mutate(inPropCat = case_when(y >= varMax ~ "histMax",
+                                           y <= varMin ~ "histMin",
+                                           y > 1 ~ ">1 SD",
+                                           y < -1 ~ "<1 SD",
+                                           y < 1 & y > -1 ~ "average"),
+                     expPropCat = case_when(estimate >= varMax ~ "histMax",
+                                            estimate <= varMin ~ "histMin",
+                                            estimate > 1 ~ ">1 SD",
+                                            estimate < -1 ~ "<1 SD",
+                                            estimate < 1 & estimate > -1 ~ "average"),
+                     finalCat = case_when(periods == "Historical" ~ inPropCat,
+                                          periods != "Historical" ~ expPropCat),
+                     finalCat = factor(finalCat, levels = c("histMax", ">1 SD",
+                                                                "average", "<1 SD", 
+                                                                "histMin")))
+
+
+projProp %>% filter(.rownames %in% c("anchRec", "sardRec")) %>%
+  select(.rownames, ESM, t, periods, finalCat) %>%
+  na.omit() %>%
+  ggplot(aes(x = periods, y = t, fill = finalCat)) +
+  geom_col(position = "fill") +
+  scale_y_continuous(labels = scales::percent) +
+  facet_grid(rows = vars(.rownames), cols = vars(ESM)) +
+  theme_bw() +
+  labs(y = "Recruitment Deviation Proportion", fill = "Category")

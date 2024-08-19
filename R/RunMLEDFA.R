@@ -326,6 +326,14 @@ datNames <- names(allDat)[-1]
 # transpose for MARSS formatting
 allDat <- allDat %>% select(-year) %>% t()
 
+datZscore <- zscore(allDat)
+corrMat <- cor(t(datZscore), use = "pairwise.complete.obs")
+pTest <- cor.mtest(t(datZscore), alternative = "two.sided", method = "pearson")
+corrplot(corrMat, p.mat = pTest$p, sig.level = 0.05, insig = "blank",
+         order = 'hclust', hclust.method = "ward.D2", #"centroid", #"single", #
+         tl.col = 'black', type = "lower",
+         cl.ratio = 0.1, tl.srt = 45, tl.cex = 0.6, #mar = c(0.1, 0.1, 0.1, 0.1), 
+         addrect = 6, rect.col = "green", diag = FALSE)
 
 # Create a custom R obs error matrix assuming each data source has it's own common error
 Rcustom <- matrix(list(0),length(datNames),length(datNames)) 
@@ -371,6 +379,10 @@ overallDFA <- MARSS(y = allDat,
 # save(overallDFA, file = "marssFit_1980to2019_noBio_5trend_Rcustom.RData")
 # save(overallDFA, file = "marssFit_1990to2019_noBio_5trend_DiagEql.RData")
 # save(overallDFA, file = "marssFit_1990to2019_noBio_6trend_DiagEql.RData")
+# save(overallDFA, file = "marssFit_1990to2019_noBioBasinScale_6trend_DiagEql.RData")
+
+load(file = "marssFit_1990to2019_noBio_6trend_DiagEql.RData")
+load(file = "marssFit_1990to2019_noBioBasinScale_6trend_DiagEql.RData")
 
 # calc RMSE
 histRMSE <- residuals(overallDFA, type = "tT")
@@ -406,7 +418,32 @@ Z.rot.up <- Z.up %*% H.inv
 Z.rot.low <- Z.low %*% H.inv 
 df <- data.frame(est = as.vector(Z.rot), 
                  conf.up = as.vector(Z.rot.up), 
-                 conf.low = as.vector(Z.rot.low) )
+                 conf.low = as.vector(Z.rot.low),
+                 Trend = rep(1:overallDFA$call$model$m, each = nrow(Z.rot)),
+                 Index = rownames(Z.rot))
+
+df <- df %>% mutate(isSig = sign(conf.low) == sign(conf.up))
+
+df %>% filter(Index == "sardRec", isSig)
+
+# look at most influential indicators with significant loadings
+# significant sardine loadings
+df %>% filter(Trend %in% c(1,4), isSig) %>% 
+  group_by(Index) %>% 
+  summarize(cummLoading = sum(abs(est))) %>% 
+  arrange(desc(cummLoading)) %>% print(n=45)
+
+# all strong sardine loadings
+df %>% filter(Trend %in% c(1,3,4,5), isSig) %>% 
+  group_by(Index) %>% 
+  summarize(cummLoading = sum(abs(est))) %>% 
+  arrange(desc(cummLoading)) %>% print(n=45)
+
+# all strong anchovy loadings
+df %>% filter(Trend %in% c(2,5), isSig) %>% 
+  group_by(Index) %>% 
+  summarize(cummLoading = sum(abs(est))) %>% 
+  arrange(desc(cummLoading)) %>% print(n=45)
 
 # plot(c(1990:2019), y= overallDFA$states, type = "l")
 # abline(h = 0)
@@ -437,9 +474,10 @@ d <- residuals(overallDFA, type = "tT")
 d$up <- qnorm(1- alpha / 2) * d$.sigma + d$.fitted 
 d$lo <- qnorm(alpha / 2) * d$.sigma + d$.fitted 
 ggplot(data = subset(d, name=="model" & 
-                       .rownames %in% c("sardRec", "anchRec", "sardLarv", 
-                                        "anchLarv", "anchBioSmrySeas2", 
-                                        "sardBioSmrySeas2"))) + 
+                       .rownames %in% c("sardRec", "anchRec", 
+                                        # "sardLarv", "anchLarv", 
+                                        # "anchBioSmrySeas2", "sardBioSmrySeas2",
+                                        "anchYoY"))) + 
   geom_point(aes(t, value)) + 
   geom_ribbon(aes(x = t, ymin = lo, ymax = up), linetype = 2, alpha = 0.2) + 
   geom_line(aes(t, .fitted), col="blue") + 
@@ -523,11 +561,15 @@ diag(RcustProj) <- c("HCI", "HCI",
                      "CalCOFI", "CalCOFI",
                      "RREAS",
                      "NEMURO", "NEMURO",
-                     "SDM", "SDM", "TIME", "TIME", "SDM", "SDM",
+                     # "SDM", "SDM", "TIME", "TIME", "SDM", "SDM",
+                     "sardSDM", "anchSDM", "sardSDM", "anchSDM", 
+                     "sardlarvSDM", "anchlarvSDM",
+                     # "SDM1", "SDM2", "SDM1", "SDM2", "SDM1", "SDM2",
                      "anchRec",
                      "sardRec",
                      "SST", "SST",
-                     "Transp", "Transp", "Transp", "Transp")
+                     "Transp", "Transp", "Transp", 
+                     "Transp")
 
 projectDFA <- MARSS(y = projDat, 
                     form = "dfa",
@@ -546,6 +588,7 @@ projectDFA <- MARSS(y = projDat,
 )
 
 # save(projectDFA, file = "marssFit_1990to2019_ProjDFA_5trend_Rcustom.RData")
+load(file = "marssFit_1990to2019_ProjDFA_5trend_Rcustom.RData")
 
 # calc RMSE
 projRMSE <- residuals(projectDFA, type = "tT")
@@ -580,7 +623,10 @@ Z.rot.up <- Z.up %*% H.inv
 Z.rot.low <- Z.low %*% H.inv 
 df <- data.frame(est = as.vector(Z.rot), 
                  conf.up = as.vector(Z.rot.up), 
-                 conf.low = as.vector(Z.rot.low) )
+                 conf.low = as.vector(Z.rot.low),
+                 Trend = rep(1:projectDFA$call$model$m, each = nrow(Z.rot)),
+                 Index = rownames(Z.rot))
+df$isSig <- sign(df$conf.up) == sign(df$conf.low)
 
 # plot(c(1990:2019), y= projectDFA$states, type = "l")
 # abline(h = 0)
@@ -607,17 +653,18 @@ loadingsDF %>% ggplot(aes(y = index)) +
 
 # fits to data from pg 137 in MARSS User Guide
 alpha <- 0.05 
-d <- residuals(projectDFA, type = "tT") 
+d <- residuals(projectDFA, type = "tT") %>% 
+        mutate(t = t + 1989)
 d$up <- qnorm(1- alpha / 2) * d$.sigma + d$.fitted 
 d$lo <- qnorm(alpha / 2) * d$.sigma + d$.fitted 
 ggplot(data = subset(d, name=="model" & 
-                       .rownames %in% c("sardRec", "anchRec", "sardLarv", 
-                                        "anchLarv", "anchBioSmrySeas2", 
-                                        "sardBioSmrySeas2"))) + 
+                       .rownames %in% c("sardRec", "anchRec", 
+                                        # "sardLarv", "anchLarv", 
+                                        "anchYoY"))) + 
   geom_point(aes(t, value)) + 
   geom_ribbon(aes(x = t, ymin = lo, ymax = up), linetype = 2, alpha = 0.2) + 
   geom_line(aes(t, .fitted), col="blue") + 
-  facet_wrap(~.rownames) + xlab("Time Step") + ylab("Count")
+  facet_wrap(~.rownames) + xlab("Year") + ylab("Count")
 
 
 
@@ -672,7 +719,7 @@ for (i in 1:dim(ts.trends)[2]) {
 
 # fits to data from pg 137 in MARSS User Guide
 alpha <- 0.05 
-d <- residuals(overallDFA, type = "tT") 
+d <- residuals(projectDFA, type = "tT") 
 d$up <- qnorm(1- alpha / 2) * d$.sigma + d$.fitted 
 d$lo <- qnorm(alpha / 2) * d$.sigma + d$.fitted 
 
@@ -717,15 +764,18 @@ loadingsDF <- data.frame(vals = Z.rot,
 # order loadings by magnitude and arrange for plotting
 varArrang <- loadingsDF %>% arrange(vals.1) %>% pull(index)
 # leave out response variables
-varArrang <- varArrang[-which(varArrang %in% c("sardRec", "anchRec", 
+varArrang <- varArrang[-which(varArrang %in% c("sardRec", "anchRec", "anchYoY",
                                                "sardLarv", "anchLarv"))]
 loadingsDF <- loadingsDF %>% mutate(index = factor(index, 
                                                    level = c("sardRec", "anchRec", 
                                                              "sardLarv", "anchLarv",
+                                                             "anchYoY",
                                                       varArrang)))
 
-myCols <- c("#F8766D", "black","#FFB000",   "#619CFF", "#00BA38")
-names(myCols) <- levels(c("Foraging", "Interest Var", "Preconditioning",  "Predation","Temperature"
+myCols <- c("#F8766D", "black","#FFB000", #"#619CFF", 
+            "#00BA38")
+names(myCols) <- levels(c("Foraging", "Interest Var", "Preconditioning",  #"Predation",
+                          "Temperature"
                           ))
 
 test1 <- loadingsDF %>% pivot_longer(cols = grep("vals.", names(loadingsDF), value = TRUE),
@@ -766,10 +816,27 @@ test1 %>%
   #                               "Foraging", "Predation", "Interest Var")) +
   labs(x = "Loadings", y = "Index") +
   geom_vline(xintercept = 0, color = "grey") +
-  geom_hline(yintercept = 4.5, color = "black") +
+  geom_hline(yintercept = 5.5, color = "black") +
   theme_classic() +
   facet_wrap(~trend, nrow = 1) #+
   # theme(legend.position = "none")
 
-loadingsDF %>% filter(index %in% c("sardRec", "anchRec", 
+loadingsDF %>% filter(index %in% c("sardRec", "anchRec", "anchYoY",
                                    "sardLarv", "anchLarv"))
+
+# check correlations between zooplankton indicators
+loadingsDF %>% filter(index %in% c("NCOPspring", "SCOPspring", "ZM_NorCal"))
+loadingsDF %>% filter(index %in% c("copBio", "naupBio", "ZM_SoCal"))
+
+# check correlations between advection indicators
+loadingsDF %>% filter(index %in% c("avgSSWIspring", "avgNearTransspring","avgOffTransspring"))
+loadingsDF %>% filter(index %in% c("avgSSWIsummer", "avgNearTranssummer", "avgOffTranssummer"))
+
+ts.trends %>% pivot_longer(cols = -t, names_to = "Trend", names_prefix = "trendStates.",
+                           values_to = "State") %>% 
+  ggplot(aes(x = t, y = State)) +
+  geom_line(linewidth = 1) +
+  facet_wrap(~Trend) +
+  labs(x= "Year", y = "State") +
+  geom_hline(yintercept = 0) +
+  theme_classic()

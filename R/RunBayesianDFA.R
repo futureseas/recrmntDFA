@@ -7,7 +7,7 @@ library(rstan)
 
 datDFA <- read_csv("recrDFAdat.csv")
 
-allDat <- datDFA %>% filter(year %in% 1980:2019) %>%
+allDat <- datDFA %>% filter(year %in% 1990:2019) %>%
             # remove contemporary adult biomass with recruits, should be S2 biomass -> S1 recs
             select(-c(NOI,
                       ENSO,
@@ -22,11 +22,11 @@ allDat <- datDFA %>% filter(year %in% 1980:2019) %>%
                       SCOPsummer,
                       PDOsummer, 
                       PDOspring,
-                      BEUTI_39N, # keep more local variables
-                      CUTI_39N,
-                      OC_LUSI_39N,
-                      OC_STI_39N,
-                      # avgNearTransspring, # spring transport had lower MARSS loadings       
+                      # BEUTI_39N, # keep more local variables
+                      # CUTI_39N,
+                      # OC_LUSI_39N,
+                      # OC_STI_39N,
+                      # avgNearTransspring, # spring transport had lower MARSS loadings
                       # avgOffTransspring,
                       # naupBio, # had low MARSS loadings
                       copMeanSize,
@@ -34,7 +34,8 @@ allDat <- datDFA %>% filter(year %in% 1980:2019) %>%
                       naupMeanSize,
                       naupPropBioSize,
                       ZL_NorCal,
-                      ZL_SoCal
+                      ZL_SoCal,
+                      age1SprAnchmeanWAA
                       )) 
 
 datNames <- names(allDat)[-1]
@@ -53,7 +54,7 @@ datDense %>% group_by(year) %>%
   geom_col()
 
 # overall proportion of missing data
-sum(is.na(allDat))/(dim(allDat)[1]*dim(allDat)[2])
+sum(is.na(allDat))/(dim(allDat)[1]*(dim(allDat)[2]-1))
 
 # long format data_shape
 longDat <- allDat %>% #select(year, HCI, OC_LUSI_33N, ZM_SoCal) %>%
