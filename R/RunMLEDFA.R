@@ -832,11 +832,43 @@ loadingsDF %>% filter(index %in% c("copBio", "naupBio", "ZM_SoCal"))
 loadingsDF %>% filter(index %in% c("avgSSWIspring", "avgNearTransspring","avgOffTransspring"))
 loadingsDF %>% filter(index %in% c("avgSSWIsummer", "avgNearTranssummer", "avgOffTranssummer"))
 
-ts.trends %>% pivot_longer(cols = -t, names_to = "Trend", names_prefix = "trendStates.",
-                           values_to = "State") %>% 
-  ggplot(aes(x = t, y = State)) +
+
+trendsAll <- tsSmooth(overallDFA, type = "xtT", interval = "confidence") %>%
+                mutate(model = "Local")
+trendsAll <- tsSmooth(projectDFA, type = "xtT", interval = "confidence") %>%
+                mutate(model = "Project") %>%
+                bind_rows(trendsAll)
+trendsAll <- trendsAll %>% mutate(hypoth = case_when(.rownames == "X1" & model == "Local" ~ "Upwelling Strength",
+                                        .rownames == "X2" & model == "Local" ~ "Upwelling Timing",
+                                        .rownames == "X3" & model == "Local" ~ "Preconditioning",
+                                        .rownames == "X4" & model == "Local" ~ "Advection",
+                                        .rownames == "X5" & model == "Local" ~ "Trophic Community",
+                                        .rownames == "X6" & model == "Local" ~ "Spawning Conditions",
+                                        .rownames == "X1" & model == "Project" ~ "Upwelling Strength",
+                                        .rownames == "X2" & model == "Project" ~ "Upwelling Timing",
+                                        .rownames == "X3" & model == "Project" ~ "Trophic Community",
+                                        .rownames == "X4" & model == "Project" ~ "Advection",
+                                        .rownames == "X5" & model == "Project" ~ "Spawning Conditions",
+                                        TRUE ~ NA),
+                     hypoth = factor(hypoth, 
+                          level = c("Upwelling Strength", "Upwelling Timing",
+                                    "Preconditioning", "Advection",
+                                    "Trophic Community", "Spawning Conditions")))
+
+invertTrends <- trendsAll %>% 
+                  mutate(invEst = case_when(model == "Project" & .rownames %in% c("X1", "X2", "X3", "X4") ~ -.estimate,
+                                            TRUE ~ .estimate),
+                         invLow = case_when(model == "Project" & .rownames %in% c("X1", "X2", "X3", "X4") ~ -.conf.low,
+                                            TRUE ~ .conf.low),
+                         invHi = case_when(model == "Project" & .rownames %in% c("X1", "X2", "X3", "X4") ~ -.conf.up,
+                                            TRUE ~ .conf.up))
+
+invertTrends %>%  
+  mutate(t = t+1989) %>%
+  ggplot(aes(x = t, y = invEst, color = model, fill = model)) +
   geom_line(linewidth = 1) +
-  facet_wrap(~Trend) +
+  geom_ribbon(aes(ymin = invLow, ymax = invHi), alpha = 0.3) +
+  facet_wrap(~hypoth) +
   labs(x= "Year", y = "State") +
   geom_hline(yintercept = 0) +
   theme_classic()

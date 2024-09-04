@@ -123,29 +123,33 @@ forecastHAD$pred %>% filter(.rownames %in% c("sardRec", "anchRec",
 projTSGFDL <- bind_rows(forecastGFDL$pred, fcastXsGFDL$pred) %>% mutate(ESM = "GFDL")
 names(projTSGFDL) <- make.names(names(projTSGFDL))
 projTSGFDL %>% 
-  filter(.rownames %in% c("HCI_R4", "BEUTI_39N", "OC_STI_33N", 
-                         "ZM_NorCal", "anchSpawnHab", "daysAbove40pct",
-                         "springSST", "avgNearTransspring",
-                         "X2", "X3", "X4", "X5",
-                         "sardRec", "anchRec")) %>%
-  mutate(.rownames = factor(.rownames, levels = c("anchSpawnHab", "daysAbove40pct",
-                                                  "HCI_R4", "BEUTI_39N", 
-                                                  "OC_STI_33N", "avgNearTransspring",
-                                                  "springSST", "ZM_NorCal", 
-                                                  "X2", "X3", "X4", "X5",
-                                                  "anchRec", "sardRec"))) %>%
-  # filter(.rownames %in% c("HCI_R3", "HCI_R4", "BEUTI_33N", "BEUTI_39N", "CUTI_33N", 
-  #                        "CUTI_39N", "OC_LUSI_33N", "OC_LUSI_36N", "OC_LUSI_39N",  
-  #                        "OC_STI_33N", "OC_STI_36N", "OC_STI_39N",  
-  #                        "ZM_NorCal", "ZM_SoCal", "sardSpawnHab", "anchSpawnHab", 
-  #                        "daysAbove5pct", "daysAbove40pct", "sardNurseHab", 
-  #                        "anchNurseHab",  "springSST", 
-  #                        "summerSST", "avgNearTransspring", "avgNearTranssummer",
-  #                        "avgOffTransspring", "avgOffTranssummer")) %>%
+  # filter(.rownames %in% c("HCI_R4", "BEUTI_39N", "OC_STI_33N", 
+  #                        "ZM_NorCal", "anchSpawnHab", "daysAbove40pct",
+  #                        "springSST", "avgNearTransspring",
+  #                        "X2", "X3", "X4", "X5",
+  #                        "sardRec", "anchRec")) %>%
+  # mutate(.rownames = factor(.rownames, levels = c("anchSpawnHab", "daysAbove40pct",
+  #                                                 "HCI_R4", "BEUTI_39N", 
+  #                                                 "OC_STI_33N", "avgNearTransspring",
+  #                                                 "springSST", "ZM_NorCal", 
+  #                                                 "X2", "X3", "X4", "X5",
+  #                                                 "anchRec", "sardRec"))) %>%
+
+  # filter(.rownames %in% paste0("X", 1:5)) %>%
+
+  filter(.rownames %in% c("HCI_R3", "HCI_R4", "BEUTI_33N", "BEUTI_39N", "CUTI_33N",
+                         "CUTI_39N", "OC_LUSI_33N", "OC_LUSI_36N", "OC_LUSI_39N",
+                         "OC_STI_33N", "OC_STI_36N", "OC_STI_39N",
+                         "ZM_NorCal", "ZM_SoCal", "sardSpawnHab", "anchSpawnHab",
+                         "daysAbove5pct", "daysAbove40pct", "sardNurseHab",
+                         "anchNurseHab",  "springSST",
+                         "summerSST", "avgNearTransspring", "avgNearTranssummer",
+                         "avgOffTransspring", "avgOffTranssummer")) %>%
+
   ggplot(aes(x = t, y = estimate)) +
   geom_line() +
   geom_ribbon(aes(ymin = Lo.95, ymax = Hi.95), alpha = 0.3) +
-  facet_wrap(~.rownames, scales = "free") +
+  facet_wrap(~.rownames, scales = "free", ncol = 4) +
   geom_point(aes(y = y), color = "steelblue", size = 0.2) +
   geom_vline(xintercept = 30.5) + geom_hline(yintercept = 0) +
   theme_classic() +
@@ -163,11 +167,46 @@ projTSGFDL %>%
   labs(title = "GFDL")
 
 # Histogram of states across all ESMs
-projTSIPSL <- forecastIPSL$pred %>% mutate(ESM = "IPSL")
+projTSIPSL <- bind_rows(forecastIPSL$pred, fcastXsIPSL$pred) %>% mutate(ESM = "IPSL")
 names(projTSIPSL) <- make.names(names(projTSIPSL))
 
-projTSHAD <- forecastHAD$pred %>% mutate(ESM = "HAD")
+projTSHAD <- bind_rows(forecastHAD$pred, fcastXsHAD$pred) %>% mutate(ESM = "HAD")
 names(projTSHAD) <- make.names(names(projTSHAD))
+
+# projTSIPSL %>% 
+projTSHAD %>% 
+  # filter(.rownames %in% paste0("X", 1:5)) %>%
+  
+  filter(.rownames %in% c("HCI_R3", "HCI_R4", "BEUTI_33N", "BEUTI_39N", "CUTI_33N",
+                          "CUTI_39N", "OC_LUSI_33N", "OC_LUSI_36N", "OC_LUSI_39N",
+                          "OC_STI_33N", "OC_STI_36N", "OC_STI_39N",
+                          "ZM_NorCal", "ZM_SoCal", "sardSpawnHab", "anchSpawnHab",
+                          "daysAbove5pct", "daysAbove40pct", "sardNurseHab",
+                          "anchNurseHab",  "springSST",
+                          "summerSST", "avgNearTransspring", "avgNearTranssummer",
+                          "avgOffTransspring", "avgOffTranssummer")) %>%
+  #   
+  ggplot(aes(x = t, y = estimate)) +
+  geom_line() +
+  geom_ribbon(aes(ymin = Lo.95, ymax = Hi.95), alpha = 0.3) +
+  facet_wrap(~.rownames, scales = "free", ncol = 4) +
+  geom_point(aes(y = y), color = "steelblue", size = 0.2) +
+  geom_vline(xintercept = 30.5) + geom_hline(yintercept = 0) +
+  theme_classic() +
+  labs(title = "HAD")
+
+# projTSIPSL %>% 
+projTSHAD %>% 
+  filter(.rownames %in% c("sardLarv", "anchLarv", "anchYoY", "anchRec", "sardRec" )) %>%
+  ggplot(aes(x = t, y = estimate)) +
+  geom_line() +
+  geom_ribbon(aes(ymin = Lo.95, ymax = Hi.95), alpha = 0.3) +
+  facet_wrap(~.rownames, scales = "free") +
+  geom_point(aes(y = y), color = "steelblue", shape = 1, size = 1) +
+  geom_vline(xintercept = 30.5) + geom_hline(yintercept = 0) +
+  theme_classic() +
+  labs(title = "HAD")
+
 
 allProj <- bind_rows(projTSHAD, projTSGFDL, projTSIPSL) %>% 
             mutate(Year = t + 1989,
@@ -179,6 +218,21 @@ allProj <- bind_rows(projTSHAD, projTSGFDL, projTSIPSL) %>%
                    periods = factor(periods, levels = c("Historical","2020-2039",
                                                         "2040-2059", "2060-2079", 
                                                         "2080-2100")))
+
+allProj %>%
+  filter(.rownames %in% c("sardLarv", "anchLarv", "anchYoY", 
+                          "anchRec", "sardRec",
+                          paste0("X", 1:5))) %>%
+  ggplot(aes(x = t, y = estimate, color = ESM, fill = ESM)) +
+  
+  geom_line() +
+  geom_ribbon(aes(ymin = Lo.95, ymax = Hi.95), alpha = 0.3) +
+  facet_wrap(~.rownames, scales = "free", nrow = 2) +
+  geom_point(aes(y = y), color = "black", shape = 1, size = 1) +
+  geom_vline(xintercept = 30.5) + geom_hline(yintercept = 0) +
+  theme_classic()
+
+
 
 allProjSmry <- allProj %>% group_by(.rownames, ESM, periods) %>%
                   summarize(varMean = mean(estimate),

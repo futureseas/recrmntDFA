@@ -173,3 +173,22 @@ xvModSel <- xvModSel %>% mutate(nIndices = length(datNames),
 write_csv(xvModSel, file = "histProjectionModelSelectionSDMerrs.csv")
 
 
+# Calculate Persistence Prediction RMSE -----------------------------------
+
+allDat %>% select(year, sardRec, anchRec) %>% 
+  filter(year >= 1990, year < 2020) %>% 
+  mutate(zscoreSardRec = zscore(sardRec),
+         zscoreAnchRec = zscore(anchRec),
+         perstSard = c(NA, zscoreSardRec[1:29]),
+         perstAnch = c(NA, zscoreAnchRec[1:29]),
+         residSard = zscoreSardRec - perstSard,
+         residAnch = zscoreAnchRec - perstAnch) %>% 
+  select(year, residAnch, residSard) %>% 
+  pivot_longer(cols = -year, names_prefix = "resid", names_to = "VoI", 
+               values_to = "perstResid") %>% 
+  filter(year %in% 2010:2019) %>%
+  group_by(VoI) %>%
+  summarize(sosRes = sum(perstResid^2, na.rm = TRUE),
+            nObs = sum(!is.na(perstResid))) %>%
+  mutate(RMSE = sqrt(sosRes/nObs)) %>% pull(RMSE) %>% sum() #%>% summarize(totRMSE = sum(RMSE))
+
