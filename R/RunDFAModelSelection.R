@@ -17,8 +17,8 @@ peels <- 10
 
 # # remove contemporary adult biomass with recruits, should be S2 biomass -> S1 recs
 # allDat <- datDFA%>% select(-c(NOI,
-#                               ENSO,
-#                               NPGO,
+#                               # ENSO,
+#                               # NPGO,
 #                               #All_Copepods, # ~same as calanoid copepods
 #                               #euphausiids, # too large for larval mouth gape
 #                               anchBioSmrySeas1,
@@ -27,8 +27,8 @@ peels <- 10
 #                               sardBioSmrySeas2,
 #                               # NCOPspring,
 #                               # SCOPspring, # summer copepod index had higher loadings
-#                               PDOsummer, # lower loading than spring, may want to try a lag
-#                               PDOspring,
+#                               # PDOsummer, # lower loading than spring, may want to try a lag
+#                               # PDOspring,
 #                               NCOPsummer,
 #                               SCOPsummer,
 #                               # BEUTI_33N, # oceanography at 39N had highest loadings
@@ -53,6 +53,8 @@ peels <- 10
 #                    "BEUTI", "BEUTI",
 #                    "CUTI", "CUTI",
 #                    "LUSI", "LUSI", "LUSI",
+#                    # "Basin", "Basin", "Basin", "Basin",
+#                    "ENSO", "NPGO", "PDOspring", "PDOsummer",
 #                    "STI", "STI", "STI",
 #                    "RREAS",
 #                    "SSWI", "SSWI",
@@ -61,7 +63,7 @@ peels <- 10
 #                    "WAA", "WAA",
 #                    "PRPOOS", "PRPOOS", #"PRPOOS", "PRPOOS", "PRPOOS", #"PRPOOS", "PRPOOS",
 #                    "NEMURO", "NEMURO",
-#                    "sardSDM", "anchSDM", "sardSDM", "anchSDM", 
+#                    "sardSDM", "anchSDM", "sardSDM", "anchSDM",
 #                    "sardlarvSDM", "anchlarvSDM",
 #                    "anchRec",
 #                    "sardRec",
@@ -170,7 +172,7 @@ xvModSel <- xvModSel %>% mutate(nIndices = length(datNames),
                                 peels = peels)
   
 # write_csv(xvModSel, file = "fullHistoricalModelSelection.csv")
-write_csv(xvModSel, file = "histProjectionModelSelectionSDMerrs.csv")
+# write_csv(xvModSel, file = "histProjectionModelSelectionSDMerrs.csv")
 
 
 # Calculate Persistence Prediction RMSE -----------------------------------

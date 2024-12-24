@@ -3,10 +3,53 @@
 
 library(tidyverse)
 library(MARSS)
+library(corrplot)
 
 # read prepped dataset
 datDFA <- read_csv("C:/Users/r.wildermuth/Documents/FutureSeas/RecruitmentIndex/recrmntDFA/recrDFAdat.csv")
 
+
+# Function to process loadings from MARSS output --------------------------
+
+ProcessLoadings <- function(outMARSS, ...){
+  
+  # Add CIs to marssMLE object 
+  outMARSS <- MARSSparamCIs(outMARSS, ...)
+  
+  # Look at factor loadings
+  # get the inverse of the rotation matrix 
+  Z.est <- coef(outMARSS, type = "matrix")$Z
+  H.inv <- 1 
+  if (ncol(Z.est) > 1){
+    H.inv <- varimax(coef(outMARSS, type = "matrix")$Z)$rotmat
+  } 
+  
+  # rotate factor loadings 
+  Z.rot <- Z.est %*% H.inv 
+  
+  # Use coef() to get the upper and lower CIs 
+  Z.low <- coef(outMARSS, type = "Z", what = "par.lowCI") 
+  Z.up <- coef(outMARSS, type = "Z", what = "par.upCI") 
+  Z.rot.up <- Z.up %*% H.inv 
+  Z.rot.low <- Z.low %*% H.inv 
+  
+  # rotate trends 
+  trends.rot <- solve(H.inv) %*% outMARSS$states
+  # get ts of trends
+  ts.trends <- t(trends.rot)
+  
+  # new df with coordinates
+  loadingsDF <- data.frame(est = as.vector(Z.rot), 
+                           conf.up = as.vector(Z.rot.up), 
+                           conf.low = as.vector(Z.rot.low),
+                           trend = rep(1:outMARSS$call$model$m, each = nrow(Z.rot)), 
+                           index = rownames(Z.rot),
+                           dummy0 = 0)
+  
+  loadingsDF$isSig <- sign(loadingsDF$conf.up) == sign(loadingsDF$conf.low)
+  
+  return(list(loadingsDF = loadingsDF, trendTS = ts.trends))
+}
 
 # Sardine model -----------------------------------------------------------
 
@@ -45,105 +88,6 @@ simpleDFA <- MARSS(y = sardDat,
                                 m = 2) # one latent process
 )
 # Second trend is mostly explained by missing data in the zooplankton dataset. Stick to one trend
-
-# plot(c(1990:2019), y= simpleDFA$states, type = "l")
-# abline(h = 0)
-
-# plot loadings
-# new df with coordinates
-loadingsDF <- data.frame(index = datNames,
-                         vals = simpleDFA$par$Z,
-                         dummy0 = 0)
-
-loadingsDF %>% ggplot(aes(y = index)) +
-  geom_segment(aes(x = dummy0,
-                   yend = index,
-                   xend = vals)) +
-  labs(x = "Loadings", y = "Index") +
-  geom_vline(xintercept = 0, color = "grey") +
-  theme_classic()
-
-# fits to data from pg 137 in MARSS User Guide
-alpha <- 0.05 
-d <- residuals(simpleDFA, type = "tT") 
-d$up <- qnorm(1- alpha / 2) * d$.sigma + d$.fitted 
-d$lo <- qnorm(alpha / 2) * d$.sigma + d$.fitted 
-ggplot(data = subset(d, name=="model")) + 
-  geom_point(aes(t, value)) + 
-  geom_ribbon(aes(x = t, ymin = lo, ymax = up), linetype = 2, alpha = 0.2) + 
-  geom_line(aes(t, .fitted), col="blue") + 
-  facet_wrap(~.rownames) + xlab("Time Step") + ylab("Count")
-
-# Look at factor loadings
-# get the inverse of the rotation matrix 
-Z.est <- coef(simpleDFA, type = "matrix")$Z 
-H.inv <- 1 
-if (ncol(Z.est) > 1){
-  H.inv <- varimax(coef(simpleDFA, type = "matrix")$Z)$rotmat
-} 
-  
-# rotate factor loadings 
-Z.rot <- Z.est %*% H.inv 
-# rotate trends 
-trends.rot <- solve(H.inv) %*% simpleDFA$states
-
-# Add CIs to marssMLE object 
-simpleDFA <- MARSSparamCIs(simpleDFA) 
-# Use coef() to get the upper and lower CIs 
-Z.low <- coef(simpleDFA, type = "Z", what = "par.lowCI") 
-Z.up <- coef(simpleDFA, type = "Z", what = "par.upCI") 
-Z.rot.up <- Z.up %*% H.inv 
-Z.rot.low <- Z.low %*% H.inv 
-df <- data.frame(est = as.vector(Z.rot), 
-                 conf.up = as.vector(Z.rot.up), 
-                 conf.low = as.vector(Z.rot.low) )
-
-# plot the factor loadings 
-spp <- rownames(sardDat) 
-N.ts <- nrow(sardDat)
-minZ <- 0.05 
-m <- dim(trends.rot)[1] 
-ylims <- c(-1.1 * max(abs(Z.rot)), 1.1 * max(abs(Z.rot))) 
-par(mfrow = c(ceiling(m / 2), 2), mar = c(3, 4, 1.5, 0.5), oma = c(0.4, 1, 1, 1)) 
-for (i in 1:m) { 
-  plot(c(1:N.ts)[abs(Z.rot[, i]) > minZ], as.vector(Z.rot[abs(Z.rot[, i]) > minZ, i]), 
-       type = "h", lwd = 2, xlab = "", ylab = "", xaxt = "n", ylim = ylims, xlim = c(0, N.ts + 1) ) 
-  for (j in 1:N.ts) { 
-    if (Z.rot[j, i] > minZ) { 
-      text(j,-0.05, spp[j], srt = 90, adj = 1, cex = 0.9) 
-      } 
-    if (Z.rot[j, i] <-minZ) { 
-      text(j, 0.05, spp[j], srt = 90, adj = 0, cex = 0.9) 
-      } 
-    abline(h = 0, lwd = 1, col = "gray") 
-    } # end j loop 
-  mtext(paste("Factor loadings on trend", i, sep = " "), side = 3, line = .5) 
-  } # end i loop
-
-# get ts of trends
-ts.trends <- t(trends.rot)
-# par(mfrow = c(ceiling(dim(ts.trends)[2] / 2), 2), mar = c(3, 4, 1.5, 0.5), oma = c(0.4, 1, 1, 1))
-# loop over each trend
-for (i in 1:dim(ts.trends)[2]) {
-  # set up plot area
-  plot(ts.trends[, i],
-       ylim = c(-1.1, 1.1) * max(abs(ts.trends)),
-       type = "n", lwd = 2, bty = "L",
-       xlab = "", ylab = "", xaxt = "n", yaxt = "n"
-  )
-  # draw zero-line
-  abline(h = 0, col = "gray")
-  # plot trend line
-  par(new = TRUE)
-  plot(ts.trends[, i],
-       ylim = c(-1.1, 1.1) * max(abs(ts.trends)),
-       type = "l", lwd = 2, bty = "L",
-       xlab = "", ylab = "", xaxt = "n"
-  )
-  # add panel labels
-  mtext(paste("Trend", i, sep = " "), side = 3, line = 0.5)
-  axis(1, 12 * (0:dim(sardDat)[2]) + 1, 1950 + 0:dim(sardDat)[2])
-} # end i loop (trends)
 
 
 # Anchovy model -----------------------------------------------------------
@@ -188,104 +132,6 @@ anchDFA <- MARSS(y = anchDat,
                      m = 1) # one latent process
 )
 
-# plot(c(1990:2019), y= anchDFA$states, type = "l")
-# abline(h = 0)
-
-# plot loadings
-# new df with coordinates
-loadingsDF <- data.frame(index = datNames,
-                         vals = anchDFA$par$Z,
-                         dummy0 = 0)
-
-loadingsDF %>% ggplot(aes(y = index)) +
-  geom_segment(aes(x = dummy0,
-                   yend = index,
-                   xend = vals)) +
-  labs(x = "Loadings", y = "Index") +
-  geom_vline(xintercept = 0, color = "grey") +
-  theme_classic()
-
-# fits to data from pg 137 in MARSS User Guide
-alpha <- 0.05 
-d <- residuals(anchDFA, type = "tT") 
-d$up <- qnorm(1- alpha / 2) * d$.sigma + d$.fitted 
-d$lo <- qnorm(alpha / 2) * d$.sigma + d$.fitted 
-ggplot(data = subset(d, name=="model")) + 
-  geom_point(aes(t, value)) + 
-  geom_ribbon(aes(x = t, ymin = lo, ymax = up), linetype = 2, alpha = 0.2) + 
-  geom_line(aes(t, .fitted), col="blue") + 
-  facet_wrap(~.rownames) + xlab("Time Step") + ylab("Count")
-
-# Look at factor loadings
-# get the inverse of the rotation matrix 
-Z.est <- coef(anchDFA, type = "matrix")$Z 
-H.inv <- 1 
-if (ncol(Z.est) > 1){
-  H.inv <- varimax(coef(anchDFA, type = "matrix")$Z)$rotmat
-} 
-
-# rotate factor loadings 
-Z.rot <- Z.est %*% H.inv 
-# rotate trends 
-trends.rot <- solve(H.inv) %*% anchDFA$states
-
-# Add CIs to marssMLE object 
-anchDFA <- MARSSparamCIs(anchDFA) 
-# Use coef() to get the upper and lower CIs 
-Z.low <- coef(anchDFA, type = "Z", what = "par.lowCI") 
-Z.up <- coef(anchDFA, type = "Z", what = "par.upCI") 
-Z.rot.up <- Z.up %*% H.inv 
-Z.rot.low <- Z.low %*% H.inv 
-df <- data.frame(est = as.vector(Z.rot), 
-                 conf.up = as.vector(Z.rot.up), 
-                 conf.low = as.vector(Z.rot.low) )
-
-# plot the factor loadings 
-spp <- rownames(anchDat) 
-N.ts <- nrow(anchDat)
-minZ <- 0.05 
-m <- dim(trends.rot)[1] 
-ylims <- c(-1.1 * max(abs(Z.rot)), 1.1 * max(abs(Z.rot))) 
-par(mfrow = c(ceiling(m / 2), 2), mar = c(3, 4, 1.5, 0.5), oma = c(0.4, 1, 1, 1)) 
-for (i in 1:m) { 
-  plot(c(1:N.ts)[abs(Z.rot[, i]) > minZ], as.vector(Z.rot[abs(Z.rot[, i]) > minZ, i]), 
-       type = "h", lwd = 2, xlab = "", ylab = "", xaxt = "n", ylim = ylims, xlim = c(0, N.ts + 1) ) 
-  for (j in 1:N.ts) { 
-    if (Z.rot[j, i] > minZ) { 
-      text(j,-0.05, spp[j], srt = 90, adj = 1, cex = 0.9) 
-    } 
-    if (Z.rot[j, i] <-minZ) { 
-      text(j, 0.05, spp[j], srt = 90, adj = 0, cex = 0.9) 
-    } 
-    abline(h = 0, lwd = 1, col = "gray") 
-  } # end j loop 
-  mtext(paste("Factor loadings on trend", i, sep = " "), side = 3, line = .5) 
-} # end i loop
-
-# get ts of trends
-ts.trends <- t(trends.rot)
-# par(mfrow = c(ceiling(dim(ts.trends)[2] / 2), 2), mar = c(3, 4, 1.5, 0.5), oma = c(0.4, 1, 1, 1))
-# loop over each trend
-for (i in 1:dim(ts.trends)[2]) {
-  # set up plot area
-  plot(ts.trends[, i],
-       ylim = c(-1.1, 1.1) * max(abs(ts.trends)),
-       type = "n", lwd = 2, bty = "L",
-       xlab = "", ylab = "", xaxt = "n", yaxt = "n"
-  )
-  # draw zero-line
-  abline(h = 0, col = "gray")
-  # plot trend line
-  par(new = TRUE)
-  plot(ts.trends[, i],
-       ylim = c(-1.1, 1.1) * max(abs(ts.trends)),
-       type = "l", lwd = 2, bty = "L",
-       xlab = "", ylab = "", xaxt = "n"
-  )
-  # add panel labels
-  mtext(paste("Trend", i, sep = " "), side = 3, line = 0.5)
-  axis(1, 12 * (0:dim(anchDat)[2]) + 1, 1980 + 0:dim(anchDat)[2])
-} # end i loop (trends)
 
 # All together -----------------------------------------------------------
 
@@ -350,7 +196,9 @@ diag(Rcustom) <- c("HCI", "HCI",
                    "WAA", "WAA",
                    "PRPOOS", "PRPOOS", #"PRPOOS", "PRPOOS", "PRPOOS", #"PRPOOS", "PRPOOS",
                    "NEMURO", "NEMURO",
-                   "SDM", "SDM", "TIME", "TIME", "SDM", "SDM",
+                   # "SDM", "SDM", "TIME", "TIME", "SDM", "SDM",
+                   "sardSDM", "anchSDM", "sardSDM", "anchSDM", 
+                   "sardlarvSDM", "anchlarvSDM",
                    "anchRec", 
                    "sardRec",
                    # "anchBio",
@@ -372,165 +220,87 @@ overallDFA <- MARSS(y = allDat,
                                # R = "equalvarcov", # observation errors equal and covars equal
                                # R = "unconstrained", # all observation errors independent
                                # R = Rcustom,
-                               m = 6) # number of latent processes
+                               m = 3) # number of latent processes
 )
 
 # save(overallDFA, file = "marssFit_1980to2019_noBio_3trend_Rcustom.RData")
 # save(overallDFA, file = "marssFit_1980to2019_noBio_5trend_Rcustom.RData")
+# save(overallDFA, file = "marssFit_1990to2019_noBio_3trend_DiagEql.RData")
 # save(overallDFA, file = "marssFit_1990to2019_noBio_5trend_DiagEql.RData")
 # save(overallDFA, file = "marssFit_1990to2019_noBio_6trend_DiagEql.RData")
 # save(overallDFA, file = "marssFit_1990to2019_noBioBasinScale_6trend_DiagEql.RData")
 
-load(file = "marssFit_1990to2019_noBio_6trend_DiagEql.RData")
+load(file = "marssFit_1990to2019_noBio_5trend_DiagEql.RData")
 load(file = "marssFit_1990to2019_noBioBasinScale_6trend_DiagEql.RData")
 
 # calc RMSE
-histRMSE <- residuals(overallDFA, type = "tT")
+histResids <- residuals(overallDFA, type = "tT")
 
-histRMSE <- histRMSE %>% filter(name == "model") %>%
+histRMSE <- histResids %>% filter(name == "model") %>%
   group_by(.rownames) %>%
   summarize(sosRes = sum(.resids^2, na.rm = TRUE),
             nObs = sum(!is.na(.resids))) %>%
   mutate(RMSE = sqrt(sosRes/nObs))
-histRMSE %>% filter(.rownames %in% c("anchYoY", "anchRec", "sardRec")) %>%
+histRMSE %>% filter(.rownames %in% c(#"anchYoY", 
+                                     "anchRec", "sardRec")) %>%
   summarize(totRMSE = sum(RMSE))
 
+loadingsHist <- ProcessLoadings(overallDFA)
 
-# Look at factor loadings
-# get the inverse of the rotation matrix 
-Z.est <- coef(overallDFA, type = "matrix")$Z 
-H.inv <- 1 
-if (ncol(Z.est) > 1){
-  H.inv <- varimax(coef(overallDFA, type = "matrix")$Z)$rotmat
-} 
+loadingsDF <- loadingsHist$loadingsDF
 
-# rotate factor loadings 
-Z.rot <- Z.est %*% H.inv 
-# rotate trends 
-trends.rot <- solve(H.inv) %*% overallDFA$states
-
-# Add CIs to marssMLE object 
-overallDFA <- MARSSparamCIs(overallDFA) 
-# Use coef() to get the upper and lower CIs 
-Z.low <- coef(overallDFA, type = "Z", what = "par.lowCI") 
-Z.up <- coef(overallDFA, type = "Z", what = "par.upCI") 
-Z.rot.up <- Z.up %*% H.inv 
-Z.rot.low <- Z.low %*% H.inv 
-df <- data.frame(est = as.vector(Z.rot), 
-                 conf.up = as.vector(Z.rot.up), 
-                 conf.low = as.vector(Z.rot.low),
-                 Trend = rep(1:overallDFA$call$model$m, each = nrow(Z.rot)),
-                 Index = rownames(Z.rot))
-
-df <- df %>% mutate(isSig = sign(conf.low) == sign(conf.up))
-
-df %>% filter(Index == "sardRec", isSig)
+loadingsDF %>% filter(index %in% c("sardRec", "anchRec", "sardLarv", "anchLarv", 
+                                   "anchYoY"), isSig) %>%
+  arrange(index)
 
 # look at most influential indicators with significant loadings
 # significant sardine loadings
-df %>% filter(Trend %in% c(1,4), isSig) %>% 
-  group_by(Index) %>% 
+loadingsDF %>% filter(trend %in% c(2,4,5), isSig) %>% 
+  group_by(index) %>% 
   summarize(cummLoading = sum(abs(est))) %>% 
   arrange(desc(cummLoading)) %>% print(n=45)
 
 # all strong sardine loadings
-df %>% filter(Trend %in% c(1,3,4,5), isSig) %>% 
-  group_by(Index) %>% 
+loadingsDF %>% filter(trend %in% c(2,5), isSig) %>% 
+  group_by(index) %>% 
+  summarize(cummLoading = sum(abs(est))) %>% 
+  arrange(desc(cummLoading)) %>% print(n=45)
+
+# significant anchovy loadings
+loadingsDF %>% filter(trend %in% c(5, 3), isSig) %>% # trend three nearly sig
+  group_by(index) %>% 
   summarize(cummLoading = sum(abs(est))) %>% 
   arrange(desc(cummLoading)) %>% print(n=45)
 
 # all strong anchovy loadings
-df %>% filter(Trend %in% c(2,5), isSig) %>% 
-  group_by(Index) %>% 
+loadingsDF %>% filter(trend %in% c(1,3), isSig) %>% 
+  group_by(index) %>% 
   summarize(cummLoading = sum(abs(est))) %>% 
   arrange(desc(cummLoading)) %>% print(n=45)
 
-# plot(c(1990:2019), y= overallDFA$states, type = "l")
-# abline(h = 0)
-# 
-# plot loadings
-# new df with coordinates
-loadingsDF <- data.frame(index = datNames,
-                         trend1 = Z.rot[, 1],
-                         trend2 = Z.rot[, 2],
-                         trend3 = Z.rot[, 3],
-                         trend4 = Z.rot[, 4],
-                         dummy0 = 0) %>%
-                pivot_longer(cols = c(trend1, trend2, trend3, trend4), 
-                             names_to = "Trend")
+# investigate whether loadings are large/significant
+loadingsDF %>% filter(isSig, abs(est) > 0.05) # only 2 variables with moderate significant loadings on trend 5
+loadingsDF %>% filter(isSig, abs(est) > 0.2)
 
-loadingsDF %>% ggplot(aes(y = index)) +
-  geom_segment(aes(x = dummy0,
-                   yend = index,
-                   xend = value)) +
-  facet_wrap(~Trend) +
-  labs(x = "Loadings", y = "Index") +
-  geom_vline(xintercept = 0, color = "grey") +
-  theme_classic()
 
 # fits to data from pg 137 in MARSS User Guide
 alpha <- 0.05 
-d <- residuals(overallDFA, type = "tT") 
-d$up <- qnorm(1- alpha / 2) * d$.sigma + d$.fitted 
-d$lo <- qnorm(alpha / 2) * d$.sigma + d$.fitted 
-ggplot(data = subset(d, name=="model" & 
-                       .rownames %in% c("sardRec", "anchRec", 
-                                        # "sardLarv", "anchLarv", 
-                                        # "anchBioSmrySeas2", "sardBioSmrySeas2",
-                                        "anchYoY"))) + 
-  geom_point(aes(t, value)) + 
-  geom_ribbon(aes(x = t, ymin = lo, ymax = up), linetype = 2, alpha = 0.2) + 
-  geom_line(aes(t, .fitted), col="blue") + 
-  facet_wrap(~.rownames) + xlab("Time Step") + ylab("Count")
+# d <- residuals(overallDFA, type = "tT") 
+# d$up <- qnorm(1- alpha / 2) * d$.sigma + d$.fitted 
+# d$lo <- qnorm(alpha / 2) * d$.sigma + d$.fitted 
+# ggplot(data = subset(d, name=="model" & 
+#                        .rownames %in% c("sardRec", "anchRec", 
+#                                         # "sardLarv", "anchLarv", 
+#                                         # "anchBioSmrySeas2", "sardBioSmrySeas2",
+#                                         "anchYoY"))) + 
+#   geom_point(aes(t, value)) + 
+#   geom_ribbon(aes(x = t, ymin = lo, ymax = up), linetype = 2, alpha = 0.2) + 
+#   geom_line(aes(t, .fitted), col="blue") + 
+#   facet_wrap(~.rownames) + xlab("Time Step") + ylab("Count")
 
-
-
-# plot the factor loadings 
-spp <- rownames(allDat) 
-N.ts <- nrow(allDat)
-minZ <- 0.05 
-m <- dim(trends.rot)[1] 
-ylims <- c(-1.1 * max(abs(Z.rot)), 1.1 * max(abs(Z.rot))) 
-par(mfrow = c(ceiling(m / 2), 2), mar = c(3, 4, 1.5, 0.5), oma = c(0.4, 1, 1, 1)) 
-for (i in 1:m) { 
-  plot(c(1:N.ts)[abs(Z.rot[, i]) > minZ], as.vector(Z.rot[abs(Z.rot[, i]) > minZ, i]), 
-       type = "h", lwd = 2, xlab = "", ylab = "", xaxt = "n", ylim = ylims, xlim = c(0, N.ts + 1) ) 
-  for (j in 1:N.ts) { 
-    if (Z.rot[j, i] > minZ) { 
-      text(j,-0.05, spp[j], srt = 90, adj = 1, cex = 0.9) 
-    } 
-    if (Z.rot[j, i] <-minZ) { 
-      text(j, 0.05, spp[j], srt = 90, adj = 0, cex = 0.9) 
-    } 
-    abline(h = 0, lwd = 1, col = "gray") 
-  } # end j loop 
-  mtext(paste("Factor loadings on trend", i, sep = " "), side = 3, line = .5) 
-} # end i loop
-
-# get ts of trends
-ts.trends <- t(trends.rot)
-par(mfrow = c(ceiling(dim(ts.trends)[2] / 2), 2), mar = c(3, 4, 1.5, 0.5), oma = c(0.4, 1, 1, 1))
-# loop over each trend
-for (i in 1:dim(ts.trends)[2]) {
-  # set up plot area
-  plot(ts.trends[, i],
-       ylim = c(-1.1, 1.1) * max(abs(ts.trends)),
-       type = "n", lwd = 2, bty = "L",
-       xlab = "", ylab = "", xaxt = "n", yaxt = "n"
-  )
-  # draw zero-line
-  abline(h = 0, col = "gray")
-  # plot trend line
-  par(new = TRUE)
-  plot(ts.trends[, i],
-       ylim = c(-1.1, 1.1) * max(abs(ts.trends)),
-       type = "l", lwd = 2, bty = "L",
-       xlab = "", ylab = "", xaxt = "n"
-  )
-  # add panel labels
-  mtext(paste("Trend", i, sep = " "), side = 3, line = 0.5)
-  axis(1,  (0:dim(allDat)[2]) , 1980 + 0:dim(allDat)[2])
-} # end i loop (trends)
+histResids <- histResids %>% mutate(up = qnorm(1- alpha / 2) * .sigma + .fitted,
+                                    lo = qnorm(alpha / 2) * .sigma + .fitted,
+                                    model = "Local")
 
 # Projection Model -----------------------------------------------------------
 
@@ -588,140 +358,59 @@ projectDFA <- MARSS(y = projDat,
 )
 
 # save(projectDFA, file = "marssFit_1990to2019_ProjDFA_5trend_Rcustom.RData")
+# save(projectDFA, file = "marssFit_1990to2019_ProjDFA_3trend_DiagEql.RData")
 load(file = "marssFit_1990to2019_ProjDFA_5trend_Rcustom.RData")
 
 # calc RMSE
-projRMSE <- residuals(projectDFA, type = "tT")
+projResids <- residuals(projectDFA, type = "tT")
 
-projRMSE <- projRMSE %>% filter(name == "model") %>%
+projRMSE <- projResids %>% filter(name == "model") %>%
               group_by(.rownames) %>%
               summarize(sosRes = sum(.resids^2, na.rm = TRUE),
                         nObs = sum(!is.na(.resids))) %>%
               mutate(RMSE = sqrt(sosRes/nObs))
-projRMSE %>% filter(.rownames %in% c("anchYoY", "anchRec", "sardRec")) %>%
+projRMSE %>% filter(.rownames %in% c(#"anchYoY", 
+                                     "anchRec", "sardRec")) %>%
   summarize(totRMSE = sum(RMSE))
 
-# Look at factor loadings
-# get the inverse of the rotation matrix 
-Z.est <- coef(projectDFA, type = "matrix")$Z 
-H.inv <- 1 
-if (ncol(Z.est) > 1){
-  H.inv <- varimax(coef(projectDFA, type = "matrix")$Z)$rotmat
-} 
+loadingsProj <- ProcessLoadings(projectDFA)
 
-# rotate factor loadings 
-Z.rot <- Z.est %*% H.inv 
-# rotate trends 
-trends.rot <- solve(H.inv) %*% projectDFA$states
+loadingsDF <- loadingsProj$loadingsDF
 
-# Add CIs to marssMLE object 
-projectDFA <- MARSSparamCIs(projectDFA) 
-# Use coef() to get the upper and lower CIs 
-Z.low <- coef(projectDFA, type = "Z", what = "par.lowCI") 
-Z.up <- coef(projectDFA, type = "Z", what = "par.upCI") 
-Z.rot.up <- Z.up %*% H.inv 
-Z.rot.low <- Z.low %*% H.inv 
-df <- data.frame(est = as.vector(Z.rot), 
-                 conf.up = as.vector(Z.rot.up), 
-                 conf.low = as.vector(Z.rot.low),
-                 Trend = rep(1:projectDFA$call$model$m, each = nrow(Z.rot)),
-                 Index = rownames(Z.rot))
-df$isSig <- sign(df$conf.up) == sign(df$conf.low)
+# investigate whether loadings are large/significant
+loadingsDF %>% filter(isSig, abs(est) > 0.05) # all trends have variables with moderate significant loadings 
+loadingsDF %>% filter(isSig, abs(est) > 0.2) # all trends have variables with strong significant loadings 
 
-# plot(c(1990:2019), y= projectDFA$states, type = "l")
-# abline(h = 0)
-# 
-# plot loadings
-# new df with coordinates
-loadingsDF <- data.frame(index = datNames,
-                         trend1 = Z.rot[, 1],
-                         trend2 = Z.rot[, 2],
-                         trend3 = Z.rot[, 3],
-                         trend4 = Z.rot[, 4],
-                         dummy0 = 0) %>%
-  pivot_longer(cols = c(trend1, trend2, trend3, trend4), 
-               names_to = "Trend")
 
-loadingsDF %>% ggplot(aes(y = index)) +
-  geom_segment(aes(x = dummy0,
-                   yend = index,
-                   xend = value)) +
-  facet_wrap(~Trend) +
-  labs(x = "Loadings", y = "Index") +
-  geom_vline(xintercept = 0, color = "grey") +
+projResids <- projResids %>% mutate(up = qnorm(1- alpha / 2) * .sigma + .fitted,
+                                    lo = qnorm(alpha / 2) * .sigma + .fitted,
+                                    model = "Projection")
+
+# fits to data from pg 137 in MARSS User Guide
+# alpha <- 0.05 
+# d <- residuals(projectDFA, type = "tT") 
+# d$up <- qnorm(1- alpha / 2) * d$.sigma + d$.fitted 
+# d$lo <- qnorm(alpha / 2) * d$.sigma + d$.fitted 
+
+# Plots for manuscript --------------------------------------------------
+
+comResids <- bind_rows(projResids, histResids)
+
+comResids %>% filter(name=="model" &
+                       .rownames %in% c("sardRec", "anchRec",
+                                        # "sardLarv", "anchLarv",
+                                        # "anchBioSmrySeas2", "sardBioSmrySeas2",
+                                        "anchYoY")) %>% 
+  mutate(t = t+1989) %>% 
+  ggplot() +
+  geom_point(aes(t, value)) +
+  geom_ribbon(aes(x = t, ymin = lo, ymax = up), linetype = 2, alpha = 0.2) +
+  geom_line(aes(t, .fitted), col="blue") +
+  facet_grid(rows = vars(model), cols = vars(.rownames)) + 
+  xlab("Time Step") + ylab("Anomaly") +
+  geom_hline(yintercept = 0, color = "black") +
   theme_classic()
-
-# fits to data from pg 137 in MARSS User Guide
-alpha <- 0.05 
-d <- residuals(projectDFA, type = "tT") %>% 
-        mutate(t = t + 1989)
-d$up <- qnorm(1- alpha / 2) * d$.sigma + d$.fitted 
-d$lo <- qnorm(alpha / 2) * d$.sigma + d$.fitted 
-ggplot(data = subset(d, name=="model" & 
-                       .rownames %in% c("sardRec", "anchRec", 
-                                        # "sardLarv", "anchLarv", 
-                                        "anchYoY"))) + 
-  geom_point(aes(t, value)) + 
-  geom_ribbon(aes(x = t, ymin = lo, ymax = up), linetype = 2, alpha = 0.2) + 
-  geom_line(aes(t, .fitted), col="blue") + 
-  facet_wrap(~.rownames) + xlab("Year") + ylab("Count")
-
-
-
-# plot the factor loadings 
-spp <- rownames(allDat) 
-N.ts <- nrow(allDat)
-minZ <- 0.05 
-m <- dim(trends.rot)[1] 
-ylims <- c(-1.1 * max(abs(Z.rot)), 1.1 * max(abs(Z.rot))) 
-par(mfrow = c(ceiling(m / 2), 2), mar = c(3, 4, 1.5, 0.5), oma = c(0.4, 1, 1, 1)) 
-for (i in 1:m) { 
-  plot(c(1:N.ts)[abs(Z.rot[, i]) > minZ], as.vector(Z.rot[abs(Z.rot[, i]) > minZ, i]), 
-       type = "h", lwd = 2, xlab = "", ylab = "", xaxt = "n", ylim = ylims, xlim = c(0, N.ts + 1) ) 
-  for (j in 1:N.ts) { 
-    if (Z.rot[j, i] > minZ) { 
-      text(j,-0.05, spp[j], srt = 90, adj = 1, cex = 0.9) 
-    } 
-    if (Z.rot[j, i] <-minZ) { 
-      text(j, 0.05, spp[j], srt = 90, adj = 0, cex = 0.9) 
-    } 
-    abline(h = 0, lwd = 1, col = "gray") 
-  } # end j loop 
-  mtext(paste("Factor loadings on trend", i, sep = " "), side = 3, line = .5) 
-} # end i loop
-
-# get ts of trends
-ts.trends <- t(trends.rot)
-par(mfrow = c(ceiling(dim(ts.trends)[2] / 2), 2), mar = c(3, 4, 1.5, 0.5), oma = c(0.4, 1, 1, 1))
-# loop over each trend
-for (i in 1:dim(ts.trends)[2]) {
-  # set up plot area
-  plot(ts.trends[, i],
-       ylim = c(-1.1, 1.1) * max(abs(ts.trends)),
-       type = "n", lwd = 2, bty = "L",
-       xlab = "", ylab = "", xaxt = "n", yaxt = "n"
-  )
-  # draw zero-line
-  abline(h = 0, col = "gray")
-  # plot trend line
-  par(new = TRUE)
-  plot(ts.trends[, i],
-       ylim = c(-1.1, 1.1) * max(abs(ts.trends)),
-       type = "l", lwd = 2, bty = "L",
-       xlab = "", ylab = "", xaxt = "n"
-  )
-  # add panel labels
-  mtext(paste("Trend", i, sep = " "), side = 3, line = 0.5)
-  axis(1,  (0:dim(allDat)[2]) , 1980 + 0:dim(allDat)[2])
-} # end i loop (trends)
-
-# Plots for ECCWO poster --------------------------------------------------
-
-# fits to data from pg 137 in MARSS User Guide
-alpha <- 0.05 
-d <- residuals(projectDFA, type = "tT") 
-d$up <- qnorm(1- alpha / 2) * d$.sigma + d$.fitted 
-d$lo <- qnorm(alpha / 2) * d$.sigma + d$.fitted 
+ 
 
 # combine trend states with variables for plotting with model fits
 ts.trends <- data.frame(trendStates = ts.trends,
@@ -756,13 +445,9 @@ d %>% filter(name=="model",
         axis.title = element_text(size = 20))
 
 # plot loadings
-# new df with coordinates
-loadingsDF <- data.frame(vals = Z.rot, 
-                         index = rownames(Z.rot),
-                         dummy0 = 0)
 
 # order loadings by magnitude and arrange for plotting
-varArrang <- loadingsDF %>% arrange(vals.1) %>% pull(index)
+varArrang <- loadingsDF %>% filter(trend == 1) %>% arrange(est) %>% pull(index)
 # leave out response variables
 varArrang <- varArrang[-which(varArrang %in% c("sardRec", "anchRec", "anchYoY",
                                                "sardLarv", "anchLarv"))]
@@ -778,12 +463,8 @@ names(myCols) <- levels(c("Foraging", "Interest Var", "Preconditioning",  #"Pred
                           "Temperature"
                           ))
 
-test1 <- loadingsDF %>% pivot_longer(cols = grep("vals.", names(loadingsDF), value = TRUE),
-                            names_to = "trend",
-                            names_prefix = "vals.",
-                            values_to = "vals") %>%
-  mutate(vals = case_when(abs(vals) < 0.05 ~ 0,
-                          TRUE ~ vals),
+test1 <- loadingsDF %>% mutate(est = case_when(abs(est) < 0.05 ~ 0,
+                                                TRUE ~ est),
          colCode = case_when(index %in% c("age1SprSardmeanWAA", "meanSSBwt",
                                           "NCOPspring", "NCOPsummerlag1",                  
                                           "SCOPspring", "SCOPsummerlag1",
@@ -808,7 +489,7 @@ test1 %>%
   ggplot(aes(y = index, color = colCode)) +
   geom_segment(aes(x = dummy0,
                    yend = index,
-                   xend = vals,
+                   xend = est,
                    linewidth = 4)) +
   scale_color_manual(values = myCols) +
   # scale_color_manual(values = c("#FFB000", "#00BA38", "#F8766D", "#619CFF", "black"),
@@ -818,7 +499,9 @@ test1 %>%
   geom_vline(xintercept = 0, color = "grey") +
   geom_hline(yintercept = 5.5, color = "black") +
   theme_classic() +
-  facet_wrap(~trend, nrow = 1) #+
+  facet_wrap(~trend, nrow = 1) +
+  geom_text(x = 0.6, color = "black", 
+            label = ifelse(test1$isSig & abs(test1$est) > 0.05, "*", ""))
   # theme(legend.position = "none")
 
 loadingsDF %>% filter(index %in% c("sardRec", "anchRec", "anchYoY",
@@ -838,36 +521,46 @@ trendsAll <- tsSmooth(overallDFA, type = "xtT", interval = "confidence") %>%
 trendsAll <- tsSmooth(projectDFA, type = "xtT", interval = "confidence") %>%
                 mutate(model = "Project") %>%
                 bind_rows(trendsAll)
+
+trendsAll %>%  
+  mutate(t = t+1989) %>%
+  ggplot(aes(x = t, y = .estimate, color = model, fill = model)) +
+  geom_line(linewidth = 1) +
+  geom_ribbon(aes(ymin = .conf.low, ymax = .conf.up), alpha = 0.3) +
+  facet_grid(cols = vars(model), rows = vars(.rownames)) +
+  labs(x= "Year", y = "State") +
+  geom_hline(yintercept = 0) +
+  theme_classic()
+
 trendsAll <- trendsAll %>% mutate(hypoth = case_when(.rownames == "X1" & model == "Local" ~ "Upwelling Strength",
                                         .rownames == "X2" & model == "Local" ~ "Upwelling Timing",
                                         .rownames == "X3" & model == "Local" ~ "Preconditioning",
                                         .rownames == "X4" & model == "Local" ~ "Advection",
-                                        .rownames == "X5" & model == "Local" ~ "Trophic Community",
-                                        .rownames == "X6" & model == "Local" ~ "Spawning Conditions",
+                                        .rownames == "X5" & model == "Local" ~ "Spawning Conditions", # new term?
                                         .rownames == "X1" & model == "Project" ~ "Upwelling Strength",
                                         .rownames == "X2" & model == "Project" ~ "Upwelling Timing",
-                                        .rownames == "X3" & model == "Project" ~ "Trophic Community",
+                                        .rownames == "X3" & model == "Project" ~ "LTL Conditions",
                                         .rownames == "X4" & model == "Project" ~ "Advection",
                                         .rownames == "X5" & model == "Project" ~ "Spawning Conditions",
                                         TRUE ~ NA),
                      hypoth = factor(hypoth, 
                           level = c("Upwelling Strength", "Upwelling Timing",
-                                    "Preconditioning", "Advection",
-                                    "Trophic Community", "Spawning Conditions")))
+                                    "Preconditioning", "Advection", "Spawning Conditions", "LTL Conditions",
+                                    "Trophic Community")))
 
-invertTrends <- trendsAll %>% 
-                  mutate(invEst = case_when(model == "Project" & .rownames %in% c("X1", "X2", "X3", "X4") ~ -.estimate,
-                                            TRUE ~ .estimate),
-                         invLow = case_when(model == "Project" & .rownames %in% c("X1", "X2", "X3", "X4") ~ -.conf.low,
-                                            TRUE ~ .conf.low),
-                         invHi = case_when(model == "Project" & .rownames %in% c("X1", "X2", "X3", "X4") ~ -.conf.up,
-                                            TRUE ~ .conf.up))
+# invertTrends <- trendsAll %>% 
+#                   mutate(invEst = case_when(model == "Project" & .rownames %in% c("X3") ~ -.estimate,
+#                                             TRUE ~ .estimate),
+#                          invLow = case_when(model == "Project" & .rownames %in% c("X3") ~ -.conf.low,
+#                                             TRUE ~ .conf.low),
+#                          invHi = case_when(model == "Project" & .rownames %in% c("X3") ~ -.conf.up,
+#                                             TRUE ~ .conf.up))
 
-invertTrends %>%  
+trendsAll %>%  
   mutate(t = t+1989) %>%
-  ggplot(aes(x = t, y = invEst, color = model, fill = model)) +
+  ggplot(aes(x = t, y = .estimate, color = model, fill = model)) +
   geom_line(linewidth = 1) +
-  geom_ribbon(aes(ymin = invLow, ymax = invHi), alpha = 0.3) +
+  geom_ribbon(aes(ymin = .conf.low, ymax = .conf.up), alpha = 0.3) +
   facet_wrap(~hypoth) +
   labs(x= "Year", y = "State") +
   geom_hline(yintercept = 0) +
