@@ -218,18 +218,46 @@ allProj <- bind_rows(projTSHAD, projTSGFDL, projTSIPSL) %>%
                    periods = factor(periods, levels = c("Historical","2020-2039",
                                                         "2040-2059", "2060-2079", 
                                                         "2080-2100")))
+# rotate factor loadings
+Z.est <- coef(projectDFA, type = "matrix")$Z
+H.inv <- 1 
+if (ncol(Z.est) > 1){
+  H.inv <- varimax(coef(projectDFA, type = "matrix")$Z)$rotmat
+} 
 
+Z.rot <- Z.est %*% H.inv
+plotZs <- as.data.frame(Z.rot)
+plotZs$.rownames <- row.names(Z.rot)
+plotZs <- plotZs %>%  filter(.rownames %in% c("avgNearTranssummer", "sardNurseHab", "HCI_R4", # (nearly) significant
+                                              "OC_STI_33N", "sardSpawnHab", "daysAbove5pct", # not sig but strong
+                                              "X4", "sardRec")) %>% 
+            mutate(.rownames = factor(.rownames, 
+                                      levels = c("avgNearTranssummer", "sardNurseHab", "HCI_R4", # (nearly) significant
+                                                 "OC_STI_33N", "sardSpawnHab", "daysAbove5pct", # not sig but strong
+                                                 "X4", "sardRec")))
+
+# Example plot of forcing variables, primary latent trend, and sardine recruitment projection
 allProj %>%
-  filter(.rownames %in% c("sardLarv", "anchLarv", "anchYoY", 
-                          "anchRec", "sardRec",
-                          paste0("X", 1:5))) %>%
+  # full_join(y = Z.rot, by = ".rownames") %>%
+  mutate(t = t+1989) %>%
+  filter(.rownames %in% c("avgNearTranssummer", "sardNurseHab", "HCI_R4", # (nearly) significant
+                          "OC_STI_33N", "sardSpawnHab", "daysAbove5pct", # not sig but strong
+                          "X4", "sardRec")) %>%
+  mutate(.rownames = factor(.rownames, levels = c("avgNearTranssummer", "sardNurseHab", "HCI_R4", # (nearly) significant
+                                                  "OC_STI_33N", "sardSpawnHab", "daysAbove5pct", # not sig but strong
+                                                  "X4", "sardRec"))) %>%
   ggplot(aes(x = t, y = estimate, color = ESM, fill = ESM)) +
-  
   geom_line() +
   geom_ribbon(aes(ymin = Lo.95, ymax = Hi.95), alpha = 0.3) +
-  facet_wrap(~.rownames, scales = "free", nrow = 2) +
+  geom_smooth(method = "loess", se = FALSE) +
+  facet_wrap(~.rownames, scales = "free", nrow = 3) +
   geom_point(aes(y = y), color = "black", shape = 1, size = 1) +
-  geom_vline(xintercept = 30.5) + geom_hline(yintercept = 0) +
+  geom_vline(xintercept = 2019.5) + geom_hline(yintercept = 0) +
+  geom_text(data = plotZs,
+            mapping = aes(x = -Inf, y = Inf, hjust = -0.5, vjust = 1.5,
+                          label = round(V4, digits = 3)), 
+            inherit.aes = FALSE,
+            color = "black") +
   theme_classic()
 
 

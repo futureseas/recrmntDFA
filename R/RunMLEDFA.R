@@ -187,7 +187,8 @@ diag(Rcustom) <- c("HCI", "HCI",
                    "COP", "COP", "COP", "COP",
                    "BEUTI", "BEUTI", 
                    "CUTI", "CUTI",
-                   "LUSI", "LUSI", "LUSI", 
+                   "LUSI", "LUSI", "LUSI",
+                   # "Basin", "Basin", "Basin", "Basin",
                    "STI", "STI", "STI",
                    "RREAS",
                    "SSWI", "SSWI",
@@ -220,7 +221,7 @@ overallDFA <- MARSS(y = allDat,
                                # R = "equalvarcov", # observation errors equal and covars equal
                                # R = "unconstrained", # all observation errors independent
                                # R = Rcustom,
-                               m = 3) # number of latent processes
+                               m = 5) # number of latent processes
 )
 
 # save(overallDFA, file = "marssFit_1980to2019_noBio_3trend_Rcustom.RData")
@@ -231,7 +232,7 @@ overallDFA <- MARSS(y = allDat,
 # save(overallDFA, file = "marssFit_1990to2019_noBioBasinScale_6trend_DiagEql.RData")
 
 load(file = "marssFit_1990to2019_noBio_5trend_DiagEql.RData")
-load(file = "marssFit_1990to2019_noBioBasinScale_6trend_DiagEql.RData")
+# load(file = "marssFit_1990to2019_noBioBasinScale_5trend_DiagEql.RData")
 
 # calc RMSE
 histResids <- residuals(overallDFA, type = "tT")
@@ -243,7 +244,7 @@ histRMSE <- histResids %>% filter(name == "model") %>%
   mutate(RMSE = sqrt(sosRes/nObs))
 histRMSE %>% filter(.rownames %in% c(#"anchYoY", 
                                      "anchRec", "sardRec")) %>%
-  summarize(totRMSE = sum(RMSE))
+  summarize(totRMSE = sum(RMSE)) %>% pull(totRMSE)
 
 loadingsHist <- ProcessLoadings(overallDFA)
 
@@ -349,11 +350,11 @@ projectDFA <- MARSS(y = projDat,
                     #                allow.degen = TRUE),
                     inits = list(x0 = matrix(1, 1, 1)),
                     z.score = TRUE,
-                    model = list(#R = "diagonal and equal", # observation errors are the same
+                    model = list(R = "diagonal and equal", # observation errors are the same
                       # R = "diagonal and unequal", # observation errors independent
                       # R = "equalvarcov", # observation errors equal and covars equal
                       # R = "unconstrained", # all observation errors independent
-                      R = RcustProj,
+                      # R = RcustProj,
                       m = 5) # number of latent processes
 )
 
@@ -371,7 +372,7 @@ projRMSE <- projResids %>% filter(name == "model") %>%
               mutate(RMSE = sqrt(sosRes/nObs))
 projRMSE %>% filter(.rownames %in% c(#"anchYoY", 
                                      "anchRec", "sardRec")) %>%
-  summarize(totRMSE = sum(RMSE))
+  summarize(totRMSE = sum(RMSE)) %>% pull(totRMSE)
 
 loadingsProj <- ProcessLoadings(projectDFA)
 
@@ -394,6 +395,63 @@ projResids <- projResids %>% mutate(up = qnorm(1- alpha / 2) * .sigma + .fitted,
 
 # Plots for manuscript --------------------------------------------------
 
+# plots of model fit, physical variables
+# histResids %>% filter(name=="model" &
+projResids %>% filter(name=="model" &
+                      .rownames %in% c("HCI_R3", "HCI_R4", "BEUTI_33N", "BEUTI_39N",
+                                       "CUTI_33N", "CUTI_39N", "OC_LUSI_33N", 
+                                       "OC_LUSI_36N", "OC_LUSI_39N", "ENSO", "NPGO",
+                                       "PDOspring", "PDOsummer", "OC_STI_33N", 
+                                       "OC_STI_36N", "OC_STI_39N", "avgSSWIspring", 
+                                       "avgSSWIsummer", "sardSpawnHab", 
+                                       "anchSpawnHab", "daysAbove5pct", 
+                                       "daysAbove40pct", "sardNurseHab", 
+                                       "anchNurseHab", "springSST", "summerSST", 
+                                       "avgNearTransspring", "avgNearTranssummer", 
+                                       "avgOffTransspring", "avgOffTranssummer")) %>% 
+  mutate(t = t+1989) %>% 
+  ggplot() +
+  geom_point(aes(t, value)) +
+  geom_ribbon(aes(x = t, ymin = lo, ymax = up), linetype = 2, alpha = 0.2) +
+  geom_line(aes(t, .fitted), col="blue") +
+  facet_wrap(~.rownames) + 
+  xlab("Time Step") + ylab("Anomaly") +
+  geom_hline(yintercept = 0, color = "black") +
+  theme_classic()
+
+# plots of model fit, biological variables
+# histResids %>% filter(name=="model" &
+projResids %>% filter(name=="model" &
+                      .rownames %in% c("NCOPspring", "NCOPsummerlag1", "SCOPspring", 
+                                       "SCOPsummerlag1", "swfscRockfishSurv_Myctophids",
+                                       "sardLarv", "anchLarv", "mesopelLarv", 
+                                       "anchYoY", "age1SprSardmeanWAA", "meanSSBwt", 
+                                       "copBio", "naupBio", "ZM_NorCal", "ZM_SoCal",
+                                       "anchRec", "sardRec", "albacore", "hake")) %>% 
+  mutate(t = t+1989) %>% 
+  ggplot() +
+  geom_point(aes(t, value)) +
+  geom_ribbon(aes(x = t, ymin = lo, ymax = up), linetype = 2, alpha = 0.2) +
+  geom_line(aes(t, .fitted), col="blue") +
+  facet_wrap(~.rownames) + 
+  xlab("Time Step") + ylab("Anomaly") +
+  geom_hline(yintercept = 0, color = "black") +
+  theme_classic()
+
+# plots of model estimated latent trends
+# histResids %>% filter(name=="state") %>% 
+projResids %>% filter(name=="state") %>% 
+  mutate(t = t+1989) %>% 
+  ggplot() +
+  geom_point(aes(t, value)) +
+  geom_ribbon(aes(x = t, ymin = lo, ymax = up), linetype = 2, alpha = 0.2) +
+  geom_line(aes(t, .fitted), col="blue") +
+  facet_wrap(~.rownames) + 
+  xlab("Time Step") + ylab("Anomaly") +
+  geom_hline(yintercept = 0, color = "black") +
+  theme_classic()
+
+# plot of model fits for variables of interest
 comResids <- bind_rows(projResids, histResids)
 
 comResids %>% filter(name=="model" &
@@ -412,38 +470,6 @@ comResids %>% filter(name=="model" &
   theme_classic()
  
 
-# combine trend states with variables for plotting with model fits
-ts.trends <- data.frame(trendStates = ts.trends,
-                        t = 1990:2019)
-
-# read projection dataset
-projDat <- read_csv("C:/Users/r.wildermuth/Documents/FutureSeas/RecruitmentIndex/DFA_data/formattedDFAprojDat.csv")
-
-# example of projection of main drivers of sardine recruitment
-exProjGFDL <- projDat %>% filter(ESM == "GFDL") %>% 
-                select(year, HCI_R4, avgNearTransspring, springSST) %>%
-                pivot_longer(cols = -year, names_to = ".rownames", values_to = "value") %>%
-                rename(t = year)
-
-d %>% filter(name=="model",
-             .rownames %in% c("HCI_R4", "avgNearTransspring",
-                              "springSST", "sardRec")) %>%
-             # .rownames %in% c("sardRec", "anchRec", "sardLarv", "anchLarv")) %>%
-  mutate(t = t+1989) %>%
-  full_join(y = ts.trends, by = "t") %>%
-  bind_rows(exProjGFDL) %>%
-  mutate(.rownames = factor(.rownames, levels = c("HCI_R4", "avgNearTransspring",
-                                                  "springSST", "sardRec"))) %>%
-  ggplot(aes(x = t)) + 
-  geom_point(aes(y = value)) + 
-  geom_ribbon(aes(ymin = lo, ymax = up), linetype = 2, alpha = 0.2) + 
-  geom_line(aes(y = .fitted), col="blue") + 
-  # geom_line(aes(y = trendStates), col = "darkgreen") +
-  facet_wrap(~.rownames, ncol = 1) + xlab("Year") + ylab("Variable Anomaly") +
-  theme_classic() +
-  theme(axis.text = element_text(size = 15),
-        axis.title = element_text(size = 20))
-
 # plot loadings
 
 # order loadings by magnitude and arrange for plotting
@@ -457,9 +483,9 @@ loadingsDF <- loadingsDF %>% mutate(index = factor(index,
                                                              "anchYoY",
                                                       varArrang)))
 
-myCols <- c("#F8766D", "black","#FFB000", #"#619CFF", 
+myCols <- c("#F8766D", "black","#FFB000", "#619CFF", 
             "#00BA38")
-names(myCols) <- levels(c("Foraging", "Interest Var", "Preconditioning",  #"Predation",
+names(myCols) <- levels(c("Foraging", "Interest Var", "Preconditioning",  "Predation",
                           "Temperature"
                           ))
 
@@ -500,7 +526,7 @@ test1 %>%
   geom_hline(yintercept = 5.5, color = "black") +
   theme_classic() +
   facet_wrap(~trend, nrow = 1) +
-  geom_text(x = 0.6, color = "black", 
+  geom_text(x = 0.9, color = "black", 
             label = ifelse(test1$isSig & abs(test1$est) > 0.05, "*", ""))
   # theme(legend.position = "none")
 
