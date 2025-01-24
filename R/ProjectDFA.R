@@ -330,3 +330,27 @@ projProp %>% filter(.rownames %in% c("anchRec", "sardRec")) %>%
   facet_grid(rows = vars(.rownames), cols = vars(ESM)) +
   theme_bw() +
   labs(y = "Recruitment Deviation Proportion", fill = "Category")
+
+# summarize frequency of being outside historical min/max values (of 81 projection years)
+inFreqs <- projProp %>% filter(Year > 2019) %>% 
+              group_by(.rownames, ESM) %>%
+              count(inPropCat) %>%
+              filter(inPropCat %in% c("histMin", "histMax")) %>%
+              pivot_wider(values_from = n, names_from = inPropCat, 
+                          names_prefix = "in_")
+  
+expFreqs <- projProp %>% filter(Year > 2019) %>% 
+              group_by(.rownames, ESM) %>%
+              count(expPropCat) %>%
+              filter(expPropCat %in% c("histMin", "histMax"))%>%
+              pivot_wider(values_from = n, names_from = expPropCat, 
+                          names_prefix = "exp_")
+
+freqMinMax <- projProp %>% filter(Year == 2019) %>%
+                select(.rownames, ESM, varMin, varMax) %>%
+                full_join(y = inFreqs, by = c(".rownames", "ESM")) %>%
+                full_join(y = expFreqs, by = c(".rownames", "ESM")) %>%
+                mutate(in_histMin = in_histMin/81,
+                       in_histMax = in_histMax/81, 
+                       exp_histMin = exp_histMin/81,
+                       exp_histMax = exp_histMax/81)

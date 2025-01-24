@@ -509,8 +509,15 @@ test1 <- loadingsDF %>% mutate(est = case_when(abs(est) < 0.05 ~ 0,
                                           "avgOffTransspring", "avgOffTranssummer") ~ "Foraging",#"#F8766D",
                              index %in% c("albacore", "hake") ~ "Predation",#"#619CFF",
                              TRUE ~ "Interest Var" ),
-         colCode = as.factor(colCode)) #%>% #"black")) %>%
-  #filter(abs(vals) > 0.1) 
+         colCode = as.factor(colCode),
+              hypoth =  case_when(trend == 1 ~ "Upwelling Strength",
+                                  trend == 2 ~ "Upwelling Timing",
+                                  trend == 3 ~ "Preconditioning",
+                                  # trend == 3 ~ "LTL Conditions",
+                                  trend == 4 ~ "Advection",
+                                  trend == 5 ~ "Spawning Conditions"),
+         labl = paste0("Trend ", trend, ": ", hypoth)) 
+
 test1 %>%
   ggplot(aes(y = index, color = colCode)) +
   geom_segment(aes(x = dummy0,
@@ -521,14 +528,15 @@ test1 %>%
   # scale_color_manual(values = c("#FFB000", "#00BA38", "#F8766D", "#619CFF", "black"),
   #                    labels = c("Preconditioning", "Temperature",
   #                               "Foraging", "Predation", "Interest Var")) +
-  labs(x = "Loadings", y = "Index") +
+  labs(x = "Loadings", y = "Index", color = "Hypothesis") +
   geom_vline(xintercept = 0, color = "grey") +
   geom_hline(yintercept = 5.5, color = "black") +
   theme_classic() +
-  facet_wrap(~trend, nrow = 1) +
-  geom_text(x = 0.9, color = "black", 
-            label = ifelse(test1$isSig & abs(test1$est) > 0.05, "*", ""))
-  # theme(legend.position = "none")
+  facet_wrap(~labl, nrow = 1) +
+  geom_text(x = .8, color = "black", 
+            label = ifelse(test1$isSig & abs(test1$est) > 0.05, "*", "")) +
+  guides(linewidth = "none",
+         color = guide_legend(override.aes = list(linewidth = 4)))
 
 loadingsDF %>% filter(index %in% c("sardRec", "anchRec", "anchYoY",
                                    "sardLarv", "anchLarv"))
