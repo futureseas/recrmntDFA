@@ -234,7 +234,15 @@ plotZs <- plotZs %>%  filter(.rownames %in% c("avgNearTranssummer", "sardNurseHa
             mutate(.rownames = factor(.rownames, 
                                       levels = c("avgNearTranssummer", "sardNurseHab", "HCI_R4", # (nearly) significant
                                                  "OC_STI_33N", "sardSpawnHab", "daysAbove5pct", # not sig but strong
-                                                 "X4", "sardRec")))
+                                                 "X4", "sardRec"),
+                                      labels = c("Nearshore Poleward Transport, Summer", 
+                                                 "Sardine Nursury Habitat", 
+                                                 "Habitat Compression, Southern CA Bight",
+                                                 "Spring Transition Index 33N", 
+                                                 "Sardine Spawning Habitat",
+                                                 "Sardine Spawning Duration",
+                                                 "Trend 4: Advection",
+                                                 "Sardine Recruitment")))
 
 # Example plot of forcing variables, primary latent trend, and sardine recruitment projection
 allProj %>%
@@ -245,7 +253,15 @@ allProj %>%
                           "X4", "sardRec")) %>%
   mutate(.rownames = factor(.rownames, levels = c("avgNearTranssummer", "sardNurseHab", "HCI_R4", # (nearly) significant
                                                   "OC_STI_33N", "sardSpawnHab", "daysAbove5pct", # not sig but strong
-                                                  "X4", "sardRec"))) %>%
+                                                  "X4", "sardRec"),
+                            labels = c("Nearshore Poleward Transport, Summer", 
+                                       "Sardine Nursury Habitat", 
+                                       "Habitat Compression, Southern CA Bight",
+                                       "Spring Transition Index 33N", 
+                                       "Sardine Spawning Habitat",
+                                       "Sardine Spawning Duration",
+                                       "Trend 4: Advection",
+                                       "Sardine Recruitment"))) %>%
   ggplot(aes(x = t, y = estimate, color = ESM, fill = ESM)) +
   geom_line() +
   geom_ribbon(aes(ymin = Lo.95, ymax = Hi.95), alpha = 0.3) +

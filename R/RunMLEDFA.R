@@ -134,38 +134,27 @@ anchDFA <- MARSS(y = anchDat,
 
 
 # All together -----------------------------------------------------------
+# keep observation data indicators, remove associated model-derived indicators
+localModel <- c("HCI_R4", "NCOPspring", "NCOPsummerlag1", "SCOPsummerlag1", 
+                "BEUTI_33N", "BEUTI_39N", "CUTI_33N", "OC_LUSI_33N", "OC_LUSI_39N",
+                "OC_STI_33N", "OC_STI_39N", "swfscRockfishSurv_Myctophids",
+                "avgSSWIspring", "avgSSWIsummer", "sardLarv", "anchLarv", 
+                "mesopelLarv", "anchYoY", "age1SprSardmeanWAA", "meanSSBwt",
+                "copBio", "naupBio", "sardSpawnHab", "anchSpawnHab", 
+                "daysAbove5pct", "daysAbove40pct", "sardNurseHab", "anchNurseHab",
+                "anchRec", "sardRec", "summerSST", "albacore", "hake")
 
+# remove observation indicators, keep associated model-derived indicators
+projectModel <- c("HCI_R4", "BEUTI_33N", "BEUTI_39N", "CUTI_33N", "OC_LUSI_33N",
+                  "OC_LUSI_39N", "OC_STI_33N", "OC_STI_39N", "ZM_NorCal",
+                  "ZM_SoCal", "sardSpawnHab", "anchSpawnHab", "daysAbove5pct",
+                  "daysAbove40pct", "sardNurseHab", "anchNurseHab", "anchRec", 
+                  "sardRec", "summerSST", "avgNearTransspring", "avgNearTranssummer", 
+                  "avgOffTransspring", "avgOffTranssummer")
 
 # subset from 1980 to 2019
 allDat <- datDFA %>% filter(year %in% 1990:2019) %>%
-            # remove contemporary adult biomass with recruits, should be S2 biomass -> S1 recs
-            select(-c(NOI,
-                      ENSO,
-                      NPGO,
-                      #All_Copepods, # ~same as calanoid copepods
-                      #euphausiids, # too large for larval mouth gape
-                      anchBioSmrySeas1,
-                      sardBioSmrySeas1,
-                      anchBioSmrySeas2, # leave out biomass since not fit well
-                      sardBioSmrySeas2,
-                      # NCOPspring,
-                      # SCOPspring, # summer copepod index had higher loadings
-                      PDOsummer, # lower loading than spring, may want to try a lag
-                      PDOspring,
-                      NCOPsummer,
-                      SCOPsummer,
-                      # BEUTI_33N, # oceanography at 39N had highest loadings
-                      # OC_LUSI_33N,
-                      # OC_LUSI_36N,
-                      # OC_STI_33N,
-                      # OC_STI_36N,
-                      copMeanSize,
-                      copPropBioSize,
-                      naupMeanSize,
-                      naupPropBioSize,
-                      ZL_NorCal,
-                      ZL_SoCal,
-                      age1SprAnchmeanWAA)) # not enough data in time windowselect(-c(#sprCalCOFILarvalSardine,
+            select(year, all_of(localModel))
 
 datNames <- names(allDat)[-1]
 
@@ -183,29 +172,24 @@ corrplot(corrMat, p.mat = pTest$p, sig.level = 0.05, insig = "blank",
 
 # Create a custom R obs error matrix assuming each data source has it's own common error
 Rcustom <- matrix(list(0),length(datNames),length(datNames)) 
-diag(Rcustom) <- c("HCI", "HCI",
-                   "COP", "COP", "COP", "COP",
-                   "BEUTI", "BEUTI", 
-                   "CUTI", "CUTI",
-                   "LUSI", "LUSI", "LUSI",
+diag(Rcustom) <- c("HCI", 
+                   "COP", "COP", "COP",
+                   "BEUTI", "BEUTI",
+                   "CUTI", 
+                   "LUSI", "LUSI",
                    # "Basin", "Basin", "Basin", "Basin",
-                   "STI", "STI", "STI",
+                   "STI", "STI", 
                    "RREAS",
                    "SSWI", "SSWI",
                    "CalCOFI", "CalCOFI", "CalCOFI",
                    "RREAS",
                    "WAA", "WAA",
-                   "PRPOOS", "PRPOOS", #"PRPOOS", "PRPOOS", "PRPOOS", #"PRPOOS", "PRPOOS",
-                   "NEMURO", "NEMURO",
-                   # "SDM", "SDM", "TIME", "TIME", "SDM", "SDM",
-                   "sardSDM", "anchSDM", "sardSDM", "anchSDM", 
+                   "PRPOOS", "PRPOOS", 
+                   "sardSDM", "anchSDM", "sardSDM", "anchSDM",
                    "sardlarvSDM", "anchlarvSDM",
-                   "anchRec", 
+                   "anchRec",
                    "sardRec",
-                   # "anchBio",
-                   # "sardBio",
-                   "SST", "SST",
-                   "Transp", "Transp", "Transp", "Transp",
+                   "SST",
                    "Alb", "Hake")
 
 overallDFA <- MARSS(y = allDat, 
@@ -221,7 +205,7 @@ overallDFA <- MARSS(y = allDat,
                                # R = "equalvarcov", # observation errors equal and covars equal
                                # R = "unconstrained", # all observation errors independent
                                # R = Rcustom,
-                               m = 5) # number of latent processes
+                               m = 4) # number of latent processes
 )
 
 # save(overallDFA, file = "marssFit_1980to2019_noBio_3trend_Rcustom.RData")
@@ -231,7 +215,7 @@ overallDFA <- MARSS(y = allDat,
 # save(overallDFA, file = "marssFit_1990to2019_noBio_6trend_DiagEql.RData")
 # save(overallDFA, file = "marssFit_1990to2019_noBioBasinScale_6trend_DiagEql.RData")
 
-load(file = "marssFit_1990to2019_noBio_5trend_DiagEql.RData")
+# load(file = "marssFit_1990to2019_noBio_5trend_DiagEql.RData")
 # load(file = "marssFit_1990to2019_noBioBasinScale_5trend_DiagEql.RData")
 
 # calc RMSE

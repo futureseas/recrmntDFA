@@ -40,6 +40,7 @@ ccAtl <- st_transform(ccAtl, "+proj=longlat +ellps=WGS84 +datum=WGS84")
 # restrict to area south of 40deg N
 newAtlbbox <- st_bbox(ccAtl)
 newAtlbbox$ymax <- 40.0
+# newAtlbbox$ymin <- 30.0
 newAtlbbox <- st_bbox(unlist(newAtlbbox))
 ccAtl <- st_crop(ccAtl, newAtlbbox)
 
@@ -66,15 +67,6 @@ sardSpawn[sardSDMs < sardHabThresh] <- NA
 pac.coast <- borders("world", colour="grey", fill="grey", xlim = c(-140, -100), ylim = c(20, 60))
 mycols <- RColorBrewer::brewer.pal(9, "Greens")#colors()[c(473,562,71,610,655,653,621,34)]
 mypalette <- colorRampPalette(mycols)(255)
-
-ggplot() +
-  geom_stars(data = sardSpawnSlice) +
-  scale_fill_gradientn(colours = mypalette, limits = c(0, 0.8), na.value = NA) +
-  guides(fill = guide_colorbar(barwidth=0.5, barheight=5)) +
-  pac.coast + 
-  geom_sf(data = ccAtl, color = "black", size = 1.5, fill = NA) +
-  coord_sf(xlim = c(-130, -113), ylim = c(27, 42)) +
-  facet_wrap(~time)
 
 sardSpawnYr <- aggregate(sardSpawn, by = "years", FUN = sum, na.rm = TRUE)
 st_get_dimension_values(sardSpawnYr, "time")
@@ -119,6 +111,15 @@ nemuroZM <- nemuroZM %>%
   st_convex_hull()
 st_crs(nemuroZM) <- "+proj=longlat +ellps=WGS84 +datum=WGS84"
 
+# RREAS survey core area
+RREAS <- data.frame(lat = c(36.5, 38.2, 38.2, 36.5),
+                       lon = c(-121.5, -121.5, -124, -124))
+RREAS <- RREAS %>%
+  st_as_sf(coords = c("lon", "lat")) %>%
+  summarize(geometry = st_union(geometry)) %>%
+  st_convex_hull()
+st_crs(RREAS) <- "+proj=longlat +ellps=WGS84 +datum=WGS84"
+
 # Reference lines for upwelling and poleward transport
 transpLines <- data.frame(lat = c(44.6, 44.6,
                                   32, 32, 32,
@@ -142,34 +143,6 @@ transpLines <- transpLines %>%
                   summarize() %>%
                   st_cast("MULTILINESTRING")
 
-sardPlot <- ggplot() +
-  geom_stars(data = sardSpawnGroundsCont) +
-  pac.coast +
-  geom_sf(data = ccAtl, color = "black", size = 1.5, fill = NA) +
-  geom_sf(data = eezs, color = "steelblue", size = 1.5, fill = NA) +
-  geom_sf(data = coreCalCOFI, color = "orangered", size = 1.5, fill = NA) +
-  geom_sf(data = nemuroZM, color = "darkgreen", size = 1.5, fill = NA) +
-  geom_sf(data = transpLines, color = "purple", size = 3) +
-  scale_fill_viridis_c(option = "mako",
-                       direction = -1,
-                       na.value = NA) +
-  guides(fill = guide_colorbar(barwidth=0.5, barheight=5)) +
-  
-  coord_sf(xlim = c(-130, -115), ylim = c(28, 48)) +
-  facet_wrap(~time) +
-  theme_minimal() +
-  labs(fill = "Cumulative \nsardine habitat")
-
-# Change to categorical (1 = in spawning grounds)
-sardSpawnGrounds[sardSpawnGrounds > 0] <- 1
-
-ggplot() +
-  geom_stars(data = sardSpawnGrounds) +
-  pac.coast +
-  geom_sf(data = ccAtl, color = "black", size = 1.5, fill = NA) +
-  # 
-  coord_sf(xlim = c(-130, -115), ylim = c(28, 42)) +
-  facet_wrap(~time)
 
 # Anchovy spawning grounds -----------------------------------------------------------------
 
@@ -216,22 +189,59 @@ anchSpawnGrounds <- anchSpawnGrounds[, , , 1]
 anchSpawnGroundsCont <- anchSpawnGrounds
 anchSpawnGroundsCont[anchSpawnGrounds == 0] <- NA
 
-anchPlot <- ggplot() +
-  geom_stars(data = anchSpawnGroundsCont) +
+# restrict to Atlantis area to above 30deg N for study area plotting
+newAtlbbox <- st_bbox(ccAtl)
+# newAtlbbox$ymax <- 40.0
+newAtlbbox$ymin <- 30.0
+newAtlbbox <- st_bbox(unlist(newAtlbbox))
+ccAtl <- st_crop(ccAtl, newAtlbbox)
+
+sardPlot <- ggplot() +
+  geom_stars(data = sardSpawnGroundsCont, color = NA) +
   pac.coast +
-  geom_sf(data = ccAtl, color = "black", size = 1.5, fill = NA) +
-  geom_sf(data = eezs, color = "steelblue", size = 1.5, fill = NA) +
-  geom_sf(data = coreCalCOFI, color = "orangered", size = 1.5, fill = NA) +
-  geom_sf(data = nemuroZM, color = "darkgreen", size = 1.5, fill = NA) +
-  geom_sf(data = transpLines, color = "purple", size = 3) +
+  geom_sf(data = ccAtl, color = "black", linewidth = 1.5, fill = NA) +
+  geom_sf(data = eezs, color = "steelblue", linewidth = 1.5, fill = NA) +
+  geom_sf(data = coreCalCOFI, color = "orangered", linewidth = 1.5, fill = NA) +
+  geom_sf(data = nemuroZM, color = "darkgreen", linewidth = 1.5, fill = NA) +
+  geom_sf(data = transpLines, color = "purple", linewidth = 2) +
   scale_fill_viridis_c(option = "mako",
                        direction = -1,
                        na.value = NA) +
   guides(fill = guide_colorbar(barwidth=0.5, barheight=5)) +
   
   coord_sf(xlim = c(-130, -115), ylim = c(28, 48)) +
-  facet_wrap(~time) +
-  theme_minimal()+
-  labs(fill = "Cumulative \nanchovy habitat")
+  # facet_wrap(~time) +
+  theme_minimal(base_size = 14) +
+  labs(fill = "Cumulative \nsardine habitat", x = "Longitude", y = "Latitude")
 
-grid.arrange(sardPlot, anchPlot)
+# Change to categorical (1 = in spawning grounds)
+sardSpawnGrounds[sardSpawnGrounds > 0] <- 1
+
+ggplot() +
+  geom_stars(data = sardSpawnGrounds) +
+  pac.coast +
+  geom_sf(data = ccAtl, color = "black", size = 1.5, fill = NA) +
+  # 
+  coord_sf(xlim = c(-130, -115), ylim = c(28, 42)) +
+  facet_wrap(~time)
+
+
+anchPlot <- ggplot() +
+  geom_stars(data = anchSpawnGroundsCont, color = NA) +
+  pac.coast +
+  geom_sf(data = ccAtl, color = "black", linewidth = 1.5, fill = NA) +
+  geom_sf(data = eezs, color = "steelblue", linewidth = 1.5, fill = NA) +
+  geom_sf(data = RREAS, color = "goldenrod2", linewidth = 1.5, fill = NA) +
+  geom_sf(data = nemuroZM, color = "darkgreen", linewidth = 1.5, fill = NA) +
+  geom_sf(data = transpLines, color = "purple", linewidth = 2) +
+  scale_fill_viridis_c(option = "mako",
+                       direction = -1,
+                       na.value = NA) +
+  guides(fill = guide_colorbar(barwidth=0.5, barheight=5)) +
+  
+  coord_sf(xlim = c(-130, -115), ylim = c(28, 48)) +
+  # facet_wrap(~time) +
+  theme_minimal(base_size = 14)+
+  labs(fill = "Cumulative \nanchovy habitat", x = "Longitude", y = "Latitude")
+
+grid.arrange(arrangeGrob(grobs = list(sardPlot, anchPlot), nrow = 1))

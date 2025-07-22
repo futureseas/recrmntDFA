@@ -30,11 +30,13 @@ LFOXV <- function(dfaDat, # data matrix formatted for MARSS input (variables in 
     
     # check convergence
     if(peelDFA$convergence != 0){
+      stop("\n Failed to converge for peel ", i)
       return(-99999) # default RMSE for failed convergence
     }
     
     # get one-step-ahead residuals
-    resids <- OSAResids(objMARSS = peelDFA, fullDat = dfaDat, p = i)
+    resids <- OSAResids(objMARSS = peelDFA, fullDat = dfaDat, p = i,
+                        colsRMSE = colsRMSE)
     
     # collect residuals for datum of interest
     peelRMSE <- resids %>% select(.rownames, t, resid.Naiv,
