@@ -155,6 +155,9 @@ projectModel <- c("HCI_R4", "BEUTI_33N", "BEUTI_39N", "CUTI_33N", "OC_LUSI_33N",
 # subset from 1980 to 2019
 allDat <- datDFA %>% filter(year %in% 1990:2019) %>%
             select(year, all_of(localModel))
+# allDat <- datDFA %>% filter(year %in% 1990:2019) %>%
+#             select(year, all_of(localModel),
+#                    ENSO, NPGO, PDOspring, PDOsummer)
 
 datNames <- names(allDat)[-1]
 
@@ -177,7 +180,6 @@ diag(Rcustom) <- c("HCI",
                    "BEUTI", "BEUTI",
                    "CUTI", 
                    "LUSI", "LUSI",
-                   # "Basin", "Basin", "Basin", "Basin",
                    "STI", "STI", 
                    "RREAS",
                    "SSWI", "SSWI",
@@ -190,7 +192,8 @@ diag(Rcustom) <- c("HCI",
                    "anchRec",
                    "sardRec",
                    "SST",
-                   "Alb", "Hake")
+                   "Alb", "Hake")#,
+                   # "Basin", "Basin", "Basin", "Basin")
 
 overallDFA <- MARSS(y = allDat, 
                     form = "dfa",
@@ -205,7 +208,7 @@ overallDFA <- MARSS(y = allDat,
                                # R = "equalvarcov", # observation errors equal and covars equal
                                # R = "unconstrained", # all observation errors independent
                                # R = Rcustom,
-                               m = 4) # number of latent processes
+                               m = 5) # number of latent processes
 )
 
 # save(overallDFA, file = "marssFit_1980to2019_noBio_3trend_Rcustom.RData")
@@ -214,6 +217,7 @@ overallDFA <- MARSS(y = allDat,
 # save(overallDFA, file = "marssFit_1990to2019_noBio_5trend_DiagEql.RData")
 # save(overallDFA, file = "marssFit_1990to2019_noBio_6trend_DiagEql.RData")
 # save(overallDFA, file = "marssFit_1990to2019_noBioBasinScale_6trend_DiagEql.RData")
+# save(overallDFA, file = "marssFit_1990to2019_noBioBasinScale_7trend_DiagEql.RData")
 
 # load(file = "marssFit_1990to2019_noBio_5trend_DiagEql.RData")
 # load(file = "marssFit_1990to2019_noBioBasinScale_5trend_DiagEql.RData")
@@ -240,28 +244,28 @@ loadingsDF %>% filter(index %in% c("sardRec", "anchRec", "sardLarv", "anchLarv",
 
 # look at most influential indicators with significant loadings
 # significant sardine loadings
-loadingsDF %>% filter(trend %in% c(2,4,5), isSig) %>% 
-  group_by(index) %>% 
-  summarize(cummLoading = sum(abs(est))) %>% 
-  arrange(desc(cummLoading)) %>% print(n=45)
-
-# all strong sardine loadings
-loadingsDF %>% filter(trend %in% c(2,5), isSig) %>% 
-  group_by(index) %>% 
-  summarize(cummLoading = sum(abs(est))) %>% 
-  arrange(desc(cummLoading)) %>% print(n=45)
-
-# significant anchovy loadings
-loadingsDF %>% filter(trend %in% c(5, 3), isSig) %>% # trend three nearly sig
-  group_by(index) %>% 
-  summarize(cummLoading = sum(abs(est))) %>% 
-  arrange(desc(cummLoading)) %>% print(n=45)
-
-# all strong anchovy loadings
-loadingsDF %>% filter(trend %in% c(1,3), isSig) %>% 
-  group_by(index) %>% 
-  summarize(cummLoading = sum(abs(est))) %>% 
-  arrange(desc(cummLoading)) %>% print(n=45)
+# loadingsDF %>% filter(trend %in% c(2,4,5), isSig) %>% 
+#   group_by(index) %>% 
+#   summarize(cummLoading = sum(abs(est))) %>% 
+#   arrange(desc(cummLoading)) %>% print(n=45)
+# 
+# # all strong sardine loadings
+# loadingsDF %>% filter(trend %in% c(2,5), isSig) %>% 
+#   group_by(index) %>% 
+#   summarize(cummLoading = sum(abs(est))) %>% 
+#   arrange(desc(cummLoading)) %>% print(n=45)
+# 
+# # significant anchovy loadings
+# loadingsDF %>% filter(trend %in% c(5, 3), isSig) %>% # trend three nearly sig
+#   group_by(index) %>% 
+#   summarize(cummLoading = sum(abs(est))) %>% 
+#   arrange(desc(cummLoading)) %>% print(n=45)
+# 
+# # all strong anchovy loadings
+# loadingsDF %>% filter(trend %in% c(1,3), isSig) %>% 
+#   group_by(index) %>% 
+#   summarize(cummLoading = sum(abs(est))) %>% 
+#   arrange(desc(cummLoading)) %>% print(n=45)
 
 # investigate whether loadings are large/significant
 loadingsDF %>% filter(isSig, abs(est) > 0.05) # only 2 variables with moderate significant loadings on trend 5
@@ -292,14 +296,7 @@ histResids <- histResids %>% mutate(up = qnorm(1- alpha / 2) * .sigma + .fitted,
 # subset from 1980 to 2019
 projDat <- datDFA %>% filter(year %in% 1990:2019) %>%
   # select only projectable vars and vars of interest
-  select("year", "HCI_R3", "HCI_R4", "BEUTI_33N", "BEUTI_39N", "CUTI_33N", 
-         "CUTI_39N", "OC_LUSI_33N",
-         "OC_LUSI_36N", "OC_LUSI_39N", "OC_STI_33N", "OC_STI_36N", "OC_STI_39N",
-         "sardLarv", "anchLarv", "anchYoY", 
-         "ZM_NorCal", "ZM_SoCal", "sardSpawnHab", "anchSpawnHab", "daysAbove5pct",
-         "daysAbove40pct", "sardNurseHab", "anchNurseHab", "anchRec", "sardRec",
-         "springSST", "summerSST", "avgNearTransspring", "avgNearTranssummer",
-         "avgOffTransspring", "avgOffTranssummer") 
+  select(year, all_of(projectModel)) 
 
 datNames <- names(projDat)[-1]
 
@@ -308,23 +305,17 @@ projDat <- projDat %>% select(-year) %>% t()
 
 # Create a custom R obs error matrix assuming each data source has it's own common error
 RcustProj <- matrix(list(0),length(datNames),length(datNames)) 
-diag(RcustProj) <- c("HCI", "HCI", 
-                     "BEUTI", "BEUTI", 
-                     "CUTI", "CUTI",
-                     "LUSI", "LUSI", "LUSI", 
-                     "STI", "STI", "STI",
-                     "CalCOFI", "CalCOFI",
-                     "RREAS",
+diag(RcustProj) <- c("HCI",
+                     "BEUTI", "BEUTI",
+                     "CUTI",
+                     "LUSI", "LUSI",
+                     "STI", "STI",
                      "NEMURO", "NEMURO",
-                     # "SDM", "SDM", "TIME", "TIME", "SDM", "SDM",
-                     "sardSDM", "anchSDM", "sardSDM", "anchSDM", 
+                     "sardSDM", "anchSDM", "sardSDM", "anchSDM",
                      "sardlarvSDM", "anchlarvSDM",
-                     # "SDM1", "SDM2", "SDM1", "SDM2", "SDM1", "SDM2",
-                     "anchRec",
-                     "sardRec",
-                     "SST", "SST",
-                     "Transp", "Transp", "Transp", 
-                     "Transp")
+                     "anchRec", "sardRec", 
+                     "SST",
+                     "Transp", "Transp", "Transp", "Transp")
 
 projectDFA <- MARSS(y = projDat, 
                     form = "dfa",
@@ -334,17 +325,17 @@ projectDFA <- MARSS(y = projDat,
                     #                allow.degen = TRUE),
                     inits = list(x0 = matrix(1, 1, 1)),
                     z.score = TRUE,
-                    model = list(R = "diagonal and equal", # observation errors are the same
-                      # R = "diagonal and unequal", # observation errors independent
+                    model = list(#R = "diagonal and equal", # observation errors are the same
+                      R = "diagonal and unequal", # observation errors independent
                       # R = "equalvarcov", # observation errors equal and covars equal
                       # R = "unconstrained", # all observation errors independent
                       # R = RcustProj,
-                      m = 5) # number of latent processes
+                      m = 6) # number of latent processes
 )
 
 # save(projectDFA, file = "marssFit_1990to2019_ProjDFA_5trend_Rcustom.RData")
 # save(projectDFA, file = "marssFit_1990to2019_ProjDFA_3trend_DiagEql.RData")
-load(file = "marssFit_1990to2019_ProjDFA_5trend_Rcustom.RData")
+# load(file = "marssFit_1990to2019_ProjDFA_5trend_Rcustom.RData")
 
 # calc RMSE
 projResids <- residuals(projectDFA, type = "tT")
@@ -362,17 +353,21 @@ loadingsProj <- ProcessLoadings(projectDFA)
 
 loadingsDF <- loadingsProj$loadingsDF
 
+loadingsDF %>% filter(index %in% c("sardRec", "anchRec", "sardLarv", "anchLarv", 
+                                   "anchYoY"), isSig) %>%
+  arrange(index)
+
 # investigate whether loadings are large/significant
 loadingsDF %>% filter(isSig, abs(est) > 0.05) # all trends have variables with moderate significant loadings 
 loadingsDF %>% filter(isSig, abs(est) > 0.2) # all trends have variables with strong significant loadings 
 
-
+alpha <- 0.05
 projResids <- projResids %>% mutate(up = qnorm(1- alpha / 2) * .sigma + .fitted,
                                     lo = qnorm(alpha / 2) * .sigma + .fitted,
                                     model = "Projection")
 
 # fits to data from pg 137 in MARSS User Guide
-# alpha <- 0.05 
+#  
 # d <- residuals(projectDFA, type = "tT") 
 # d$up <- qnorm(1- alpha / 2) * d$.sigma + d$.fitted 
 # d$lo <- qnorm(alpha / 2) * d$.sigma + d$.fitted 
@@ -467,9 +462,9 @@ loadingsDF <- loadingsDF %>% mutate(index = factor(index,
                                                              "anchYoY",
                                                       varArrang)))
 
-myCols <- c("#F8766D", "black","#FFB000", "#619CFF", 
+myCols <- c("#F8766D", "black","#FFB000", #"#619CFF", 
             "#00BA38")
-names(myCols) <- levels(c("Foraging", "Interest Var", "Preconditioning",  "Predation",
+names(myCols) <- levels(c("Foraging", "Interest Var", "Preconditioning",  #"Predation",
                           "Temperature"
                           ))
 
@@ -517,7 +512,7 @@ test1 %>%
   geom_hline(yintercept = 5.5, color = "black") +
   theme_classic() +
   facet_wrap(~labl, nrow = 1) +
-  geom_text(x = .8, color = "black", 
+  geom_text(x = 1, color = "black", 
             label = ifelse(test1$isSig & abs(test1$est) > 0.05, "*", "")) +
   guides(linewidth = "none",
          color = guide_legend(override.aes = list(linewidth = 4)))
@@ -583,3 +578,49 @@ trendsAll %>%
   labs(x= "Year", y = "State") +
   geom_hline(yintercept = 0) +
   theme_classic()
+
+# Test against random time series -----------------------------------------
+
+# record estimated loading and significance for random variable over 100 iterations
+randLoading <- tibble(est = 0, conf.up = 0, conf.low = 0, trend = 0, index = "", 
+                      dummy0 = 0, isSig = 0)
+
+for(ii in 1:100){
+  # subset from 1990 to 2019
+  allDat <- datDFA %>% filter(year %in% 1990:2019) %>%
+              select(year, all_of(localModel))
+  
+  # add random vector to test strength of loadings relative to random var
+  allDat <- allDat %>% mutate(randTest = rnorm(n = nrow(allDat)))
+  
+  datNames <- names(allDat)[-1]
+  
+  # transpose for MARSS formatting
+  allDat <- allDat %>% select(-year) %>% t()
+  
+  randDFA <- MARSS(y = allDat, 
+                   form = "dfa",
+                   method = "BFGS",
+                   # control = list(maxit = 10000,
+                   #                conv.test.slope.tol = 0.1,
+                   #                allow.degen = TRUE),
+                   inits = list(x0 = matrix(1, 1, 1)),
+                   z.score = TRUE,
+                   model = list( R = "diagonal and equal", # observation errors are the same
+                                 m = 2) # number of latent processes
+  )
+  
+  loadingsHist <- ProcessLoadings(randDFA)
+  
+  loadingsDF <- loadingsHist$loadingsDF
+  
+  randLoading <- loadingsDF %>% filter(index == "randTest") %>% 
+                    bind_rows(randLoading)
+}
+
+summary(abs(randLoading$est))
+
+randLoading %>% filter(index != "", isSig == 1) %>% group_by(trend, index) %>% 
+    summarize(meanRandLoad = mean(abs(est)),
+              medianRandLoad = median(abs(est)))
+# most absolute significant loadings < 0.3 no better than random (for trend 1)
