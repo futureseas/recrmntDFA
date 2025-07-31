@@ -607,7 +607,7 @@ for(ii in 1:100){
                    inits = list(x0 = matrix(1, 1, 1)),
                    z.score = TRUE,
                    model = list( R = "diagonal and equal", # observation errors are the same
-                                 m = 2) # number of latent processes
+                                 m = 4) # number of latent processes
   )
   
   loadingsHist <- ProcessLoadings(randDFA)
@@ -623,4 +623,11 @@ summary(abs(randLoading$est))
 randLoading %>% filter(index != "", isSig == 1) %>% group_by(trend, index) %>% 
     summarize(meanRandLoad = mean(abs(est)),
               medianRandLoad = median(abs(est)))
-# most absolute significant loadings < 0.3 no better than random (for trend 1)
+# most absolute significant loadings < ~0.3 no better than random (for trend 1)
+# < ~0.12 no better than random for trend 4
+# trend index    meanRandLoad medianRandLoad
+# <dbl> <chr>           <dbl>          <dbl>
+# 1     1 randTest        0.289          0.277
+# 2     2 randTest        0.241          0.242
+# 3     3 randTest        0.165          0.146
+# 4     4 randTest        0.121          0.119
