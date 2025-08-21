@@ -154,9 +154,9 @@ projectModel <- c("HCI_R4", "BEUTI_33N", "BEUTI_39N", "CUTI_33N", "OC_LUSI_33N",
 
 # subset from 1980 to 2019
 allDat <- datDFA %>% filter(year %in% 1990:2019) %>%
-            select(year, all_of(localModel))
+            select(year, all_of(localModel), all_of(projectModel))
 # allDat <- datDFA %>% filter(year %in% 1990:2019) %>%
-#             select(year, all_of(localModel),
+#             select(year, all_of(localModel), all_of(projectModel),
 #                    ENSO, NPGO, PDOspring, PDOsummer)
 
 datNames <- names(allDat)[-1]
@@ -192,7 +192,9 @@ diag(Rcustom) <- c("HCI",
                    "anchRec",
                    "sardRec",
                    "SST",
-                   "Alb", "Hake")#,
+                   "Alb", "Hake",
+                   "NEMURO", "NEMURO",
+                   "Transp", "Transp", "Transp", "Transp")
                    # "Basin", "Basin", "Basin", "Basin")
 
 overallDFA <- MARSS(y = allDat, 
@@ -203,24 +205,26 @@ overallDFA <- MARSS(y = allDat,
                  #                allow.degen = TRUE),
                  inits = list(x0 = matrix(1, 1, 1)),
                  z.score = TRUE,
-                 model = list(R = "diagonal and equal", # observation errors are the same
+                 model = list(#R = "diagonal and equal", # observation errors are the same
                                # R = "diagonal and unequal", # observation errors independent
                                # R = "equalvarcov", # observation errors equal and covars equal
                                # R = "unconstrained", # all observation errors independent
-                               # R = Rcustom,
-                               m = 5) # number of latent processes
+                               R = Rcustom,
+                               m = 4) # number of latent processes
 )
 
 # save(overallDFA, file = "marssFit_1980to2019_noBio_3trend_Rcustom.RData")
-# save(overallDFA, file = "marssFit_1980to2019_noBio_5trend_Rcustom.RData")
-# save(overallDFA, file = "marssFit_1990to2019_noBio_3trend_DiagEql.RData")
+# save(overallDFA, file = "marssFit_1990to2019_noBio_5trend_Rcustom.RData")
+# save(overallDFA, file = "marssFit_1990to2019_noBio_2trend_DiagEql.RData")
 # save(overallDFA, file = "marssFit_1990to2019_noBio_5trend_DiagEql.RData")
 # save(overallDFA, file = "marssFit_1990to2019_noBio_6trend_DiagEql.RData")
 # save(overallDFA, file = "marssFit_1990to2019_noBioBasinScale_6trend_DiagEql.RData")
-# save(overallDFA, file = "marssFit_1990to2019_noBioBasinScale_7trend_DiagEql.RData")
+# save(overallDFA, file = "marssFit_1990to2019_noBioBasinScale_2trend_DiagEql.RData")
 
-# load(file = "marssFit_1990to2019_noBio_5trend_DiagEql.RData")
-# load(file = "marssFit_1990to2019_noBioBasinScale_5trend_DiagEql.RData")
+load(file = "marssFit_1990to2019_noBio_2trend_DiagEql.RData")
+# load(file = "marssFit_1990to2019_noBio_5trend_Rcustom.RData")
+# load(file = "marssFit_1990to2019_noBioBasinScale_2trend_DiagEql.RData")
+# load(file = "marssFit_1990to2019_noBioBasinScale_4trend_DiagEql.RData")
 
 # calc RMSE
 histResids <- residuals(overallDFA, type = "tT")
@@ -244,10 +248,10 @@ loadingsDF %>% filter(index %in% c("sardRec", "anchRec", "sardLarv", "anchLarv",
 
 # look at most influential indicators with significant loadings
 # significant sardine loadings
-# loadingsDF %>% filter(trend %in% c(2,4,5), isSig) %>% 
-#   group_by(index) %>% 
-#   summarize(cummLoading = sum(abs(est))) %>% 
-#   arrange(desc(cummLoading)) %>% print(n=45)
+loadingsDF %>% filter(trend %in% c(1,2), isSig) %>%
+  group_by(index) %>%
+  summarize(cummLoading = sum(abs(est))) %>%
+  arrange(desc(cummLoading)) %>% print(n=45)
 # 
 # # all strong sardine loadings
 # loadingsDF %>% filter(trend %in% c(2,5), isSig) %>% 
@@ -256,10 +260,10 @@ loadingsDF %>% filter(index %in% c("sardRec", "anchRec", "sardLarv", "anchLarv",
 #   arrange(desc(cummLoading)) %>% print(n=45)
 # 
 # # significant anchovy loadings
-# loadingsDF %>% filter(trend %in% c(5, 3), isSig) %>% # trend three nearly sig
-#   group_by(index) %>% 
-#   summarize(cummLoading = sum(abs(est))) %>% 
-#   arrange(desc(cummLoading)) %>% print(n=45)
+loadingsDF %>% filter(trend %in% c(2), isSig) %>% 
+  group_by(index) %>%
+  summarize(cummLoading = sum(abs(est))) %>%
+  arrange(desc(cummLoading)) %>% print(n=45)
 # 
 # # all strong anchovy loadings
 # loadingsDF %>% filter(trend %in% c(1,3), isSig) %>% 
@@ -271,6 +275,75 @@ loadingsDF %>% filter(index %in% c("sardRec", "anchRec", "sardLarv", "anchLarv",
 loadingsDF %>% filter(isSig, abs(est) > 0.05) # only 2 variables with moderate significant loadings on trend 5
 loadingsDF %>% filter(isSig, abs(est) > 0.2)
 
+# significant random loadings from a 5-trend Local indicators model with equal variance
+# trend index    meanRandLoad medianRandLoad
+# <dbl> <chr>           <dbl>          <dbl>
+# 1     1 randTest        0.350          0.384
+# 2     2 randTest        0.310          0.274
+# 3     3 randTest        0.196          0.184
+# 4     4 randTest        0.245          0.168
+# 5     5 randTest        0.165          0.170
+# check that at least one variable is above the mean thresholds on each trend
+loadingsDF %>% filter(isSig, 
+                      abs(est) > 0.35 & trend == 1 |
+                      abs(est) > 0.31 & trend == 2 |
+                      abs(est) > 0.196 & trend == 3 |
+                      abs(est) > 0.245 & trend == 4 |
+                      abs(est) > 0.165 & trend == 5) # doesn't pass
+
+# significant random loadings from a 5-trend Local indicators model with custom error variance
+# trend index    meanRandLoad medianRandLoad nSigRand
+# <dbl> <chr>           <dbl>          <dbl>    <int>
+# 1     1 randTest       0.267          0.217        30
+# 2     2 randTest       0.290          0.252        36
+# 3     3 randTest       0.263          0.233        29
+# 4     4 randTest       0.0699         0.0764        7
+# 5     5 randTest       0.135          0.144         8
+loadingsDF %>% filter(isSig, 
+                      abs(est) > 0.267 & trend == 1 |
+                        abs(est) > 0.290 & trend == 2 |
+                        abs(est) > 0.263 & trend == 3 |
+                        abs(est) > 0.15 & trend == 4 | # apply minimum 0.15 threshold to be precautionary
+                        abs(est) > 0.135 & trend == 5)
+# !!RW: estimate of obs error for HCI_R4 too small
+
+# significant random loadings from a 4-trend Local indicators model with equal variance
+# trend index    meanRandLoad medianRandLoad
+# <dbl> <chr>           <dbl>          <dbl>
+# 1     1 randTest        0.297          0.280
+# 2     2 randTest        0.305          0.332
+# 3     3 randTest        0.233          0.228
+# 4     4 randTest        0.176          0.171
+loadingsDF %>% filter(isSig, 
+                      abs(est) > 0.297 & trend == 1 |
+                      abs(est) > 0.305 & trend == 2 |
+                      abs(est) > 0.233 & trend == 3 | # doesn't pass
+                      abs(est) > 0.176 & trend == 4)
+
+# significant random loadings from a 3-trend Local indicators model with equal variance
+# RW: Not many models (<40 of 100) found significant loadings for random ts
+# trend index    meanRandLoad medianRandLoad nSigRand
+# <dbl> <chr>           <dbl>          <dbl>    <int>
+# 1     1 randTest        0.934         0.162        40
+# 2     2 randTest        0.508         0.0883       19
+# 3     3 randTest        4.45          0.331         8
+# !!RW: neither 3-trend w/ equal variance or custum variance had sig loadings for anchRec
+
+# significant random loadings from a 2-trend Local indicators model with equal variance
+# trend index    meanRandLoad medianRandLoad nSigRand
+# <dbl> <chr>           <dbl>          <dbl>    <int>
+# 1     1 randTest        0.273          0.258       18
+# 2     2 randTest        0.137          0.124       49
+loadingsDF %>% filter(isSig, 
+                      abs(est) > 0.273 & trend == 1 |
+                        abs(est) > 0.137 & trend == 2)
+
+loadingsDF %>% filter(isSig, 
+                      abs(est) > 0.273 & trend == 1 |
+                        abs(est) > 0.137 & trend == 2) %>%
+  group_by(index) %>%
+  summarize(cummLoading = sum(abs(est))) %>%
+  arrange(desc(cummLoading)) %>% print(n=45)
 
 # fits to data from pg 137 in MARSS User Guide
 alpha <- 0.05 
@@ -325,17 +398,19 @@ projectDFA <- MARSS(y = projDat,
                     #                allow.degen = TRUE),
                     inits = list(x0 = matrix(1, 1, 1)),
                     z.score = TRUE,
-                    model = list(#R = "diagonal and equal", # observation errors are the same
-                      R = "diagonal and unequal", # observation errors independent
+                    model = list(R = "diagonal and equal", # observation errors are the same
+                      # R = "diagonal and unequal", # observation errors independent
                       # R = "equalvarcov", # observation errors equal and covars equal
                       # R = "unconstrained", # all observation errors independent
                       # R = RcustProj,
-                      m = 6) # number of latent processes
+                      m = 3) # number of latent processes
 )
 
 # save(projectDFA, file = "marssFit_1990to2019_ProjDFA_5trend_Rcustom.RData")
+# save(projectDFA, file = "marssFit_1990to2019_ProjDFA_4trend_Rcustom.RData")
 # save(projectDFA, file = "marssFit_1990to2019_ProjDFA_3trend_DiagEql.RData")
-# load(file = "marssFit_1990to2019_ProjDFA_5trend_Rcustom.RData")
+load(file = "marssFit_1990to2019_ProjDFA_3trend_DiagEql.RData")
+# load(file = "marssFit_1990to2019_ProjDFA_4trend_Rcustom.RData")
 
 # calc RMSE
 projResids <- residuals(projectDFA, type = "tT")
@@ -361,6 +436,68 @@ loadingsDF %>% filter(index %in% c("sardRec", "anchRec", "sardLarv", "anchLarv",
 loadingsDF %>% filter(isSig, abs(est) > 0.05) # all trends have variables with moderate significant loadings 
 loadingsDF %>% filter(isSig, abs(est) > 0.2) # all trends have variables with strong significant loadings 
 
+# significant random loadings from a 5-trend Projection indicators model with custom error variance
+# trend index    meanRandLoad medianRandLoad nSigRand
+# <dbl> <chr>           <dbl>          <dbl>    <int>
+# 1     1 randTest        0.336          0.351       40
+# 2     2 randTest        0.187          0.168       27
+# 3     3 randTest        0.369          0.350       22
+# 4     4 randTest        0.222          0.185       26
+# 5     5 randTest        0.289          0.248       34
+#
+loadingsDF %>% filter(isSig, 
+                      abs(est) > 0.336 & trend == 1 |
+                        abs(est) > 0.187 & trend == 2 |
+                        abs(est) > 0.369 & trend == 3 | # doesn't pass
+                        abs(est) > 0.222 & trend == 4 | 
+                        abs(est) > 0.289 & trend == 5)
+
+# trend index    meanRandLoad medianRandLoad nSigRand
+# <dbl> <chr>           <dbl>          <dbl>    <int>
+# 1     1 randTest        0.217         0.165       100
+# 2     2 randTest        0.101         0.0725      100
+# 3     3 randTest        0.153         0.0772      100
+# 4     4 randTest        0.111         0.0837      100
+# 5     5 randTest        0.186         0.143       100
+
+# significant random loadings from a 4-trend Projection indicators model with custom error variance
+# trend index    meanRandLoad medianRandLoad nSigRand
+# <dbl> <chr>           <dbl>          <dbl>    <int>
+# 1     1 randTest        0.274          0.243       28
+# 2     2 randTest        0.239          0.256       38
+# 3     3 randTest        0.210          0.192       24
+# 4     4 randTest        0.150          0.103       22
+loadingsDF %>% filter(isSig, 
+                      abs(est) > 0.274 & trend == 1 |
+                        abs(est) > 0.239 & trend == 2 |
+                        abs(est) > 0.210 & trend == 3 |
+                        abs(est) > 0.150 & trend == 4)
+                      
+# trend index    meanRandLoad medianRandLoad nSigRand
+# <dbl> <chr>           <dbl>          <dbl>    <int>
+# 1     1 randTest       0.153          0.109       100
+# 2     2 randTest       0.149          0.0859      100
+# 3     3 randTest       0.116          0.0608      100
+# 4     4 randTest       0.0838         0.0569      100
+
+# significant random loadings from a 3-trend Projection indicators model with equal error variance
+# trend index    meanRandLoad medianRandLoad nSigRand
+# <dbl> <chr>           <dbl>          <dbl>    <int>
+# 1     1 randTest        0.245          0.230       45
+# 2     2 randTest        0.145          0.128       44
+# 3     3 randTest        0.249          0.242       14
+loadingsDF %>% filter(isSig, 
+                      abs(est) > 0.245 & trend == 1 |
+                        abs(est) > 0.145 & trend == 2 |
+                        abs(est) > 0.249 & trend == 3)
+# Influential variables for sardine and anchovy recruitment
+loadingsDF %>% filter(isSig, 
+                      abs(est) > 0.245 & trend == 1 |
+                        abs(est) > 0.145 & trend == 2) %>%
+  group_by(index) %>%
+  summarize(cummLoading = sum(abs(est))) %>%
+  arrange(desc(cummLoading)) %>% print(n=45)
+
 alpha <- 0.05
 projResids <- projResids %>% mutate(up = qnorm(1- alpha / 2) * .sigma + .fitted,
                                     lo = qnorm(alpha / 2) * .sigma + .fitted,
@@ -375,8 +512,8 @@ projResids <- projResids %>% mutate(up = qnorm(1- alpha / 2) * .sigma + .fitted,
 # Plots for manuscript --------------------------------------------------
 
 # plots of model fit, physical variables
-# histResids %>% filter(name=="model" &
-projResids %>% filter(name=="model" &
+histResids %>% filter(name=="model" &
+# projResids %>% filter(name=="model" &
                       .rownames %in% c("HCI_R3", "HCI_R4", "BEUTI_33N", "BEUTI_39N",
                                        "CUTI_33N", "CUTI_39N", "OC_LUSI_33N", 
                                        "OC_LUSI_36N", "OC_LUSI_39N", "ENSO", "NPGO",
@@ -399,8 +536,8 @@ projResids %>% filter(name=="model" &
   theme_classic()
 
 # plots of model fit, biological variables
-# histResids %>% filter(name=="model" &
-projResids %>% filter(name=="model" &
+histResids %>% filter(name=="model" &
+# projResids %>% filter(name=="model" &
                       .rownames %in% c("NCOPspring", "NCOPsummerlag1", "SCOPspring", 
                                        "SCOPsummerlag1", "swfscRockfishSurv_Myctophids",
                                        "sardLarv", "anchLarv", "mesopelLarv", 
@@ -418,8 +555,8 @@ projResids %>% filter(name=="model" &
   theme_classic()
 
 # plots of model estimated latent trends
-# histResids %>% filter(name=="state") %>% 
-projResids %>% filter(name=="state") %>% 
+histResids %>% filter(name=="state") %>%
+# projResids %>% filter(name=="state") %>%
   mutate(t = t+1989) %>% 
   ggplot() +
   geom_point(aes(t, value)) +
@@ -489,13 +626,13 @@ test1 <- loadingsDF %>% mutate(est = case_when(abs(est) < 0.05 ~ 0,
                              index %in% c("albacore", "hake") ~ "Predation",#"#619CFF",
                              TRUE ~ "Interest Var" ),
          colCode = as.factor(colCode),
-              hypoth =  case_when(trend == 1 ~ "Upwelling Strength",
-                                  trend == 2 ~ "Upwelling Timing",
-                                  trend == 3 ~ "Preconditioning",
-                                  # trend == 3 ~ "LTL Conditions",
-                                  trend == 4 ~ "Advection",
-                                  trend == 5 ~ "Spawning Conditions"),
-         labl = paste0("Trend ", trend, ": ", hypoth)) 
+              # hypoth =  case_when(trend == 1 ~ "Upwelling Strength",
+              #                     trend == 2 ~ "Preconditioning",
+              #                     trend == 3 ~ "Advection & Forage",
+              #                     # trend == 3 ~ "LTL Conditions",
+              #                     trend == 4 ~ "Spawning Conditions",
+              #                     trend == 5 ~ "So. CCE Conditions"),
+         labl = paste0("Trend ", trend)) 
 
 test1 %>%
   ggplot(aes(y = index, color = colCode)) +
@@ -509,11 +646,16 @@ test1 %>%
   #                               "Foraging", "Predation", "Interest Var")) +
   labs(x = "Loadings", y = "Index", color = "Hypothesis") +
   geom_vline(xintercept = 0, color = "grey") +
-  geom_hline(yintercept = 5.5, color = "black") +
+  geom_hline(yintercept = 2.5, color = "black") +
   theme_classic() +
   facet_wrap(~labl, nrow = 1) +
-  geom_text(x = 1, color = "black", 
-            label = ifelse(test1$isSig & abs(test1$est) > 0.05, "*", "")) +
+  geom_segment(data = test1 %>% filter(isSig == 0),
+               aes(x = dummy0,
+                   yend = index,
+                   xend = sign(est) * (abs(est)-0.02)),
+                   linewidth = 2, color = "white")+
+  # geom_text(x = .8, color = "black",
+  #           label = ifelse(test1$isSig & abs(test1$est) > 0.05, "*", "")) +
   guides(linewidth = "none",
          color = guide_legend(override.aes = list(linewidth = 4)))
 
@@ -545,21 +687,22 @@ trendsAll %>%
   geom_hline(yintercept = 0) +
   theme_classic()
 
-trendsAll <- trendsAll %>% mutate(hypoth = case_when(.rownames == "X1" & model == "Local" ~ "Upwelling Strength",
-                                        .rownames == "X2" & model == "Local" ~ "Upwelling Timing",
-                                        .rownames == "X3" & model == "Local" ~ "Preconditioning",
-                                        .rownames == "X4" & model == "Local" ~ "Advection",
-                                        .rownames == "X5" & model == "Local" ~ "Spawning Conditions", # new term?
-                                        .rownames == "X1" & model == "Project" ~ "Upwelling Strength",
-                                        .rownames == "X2" & model == "Project" ~ "Upwelling Timing",
-                                        .rownames == "X3" & model == "Project" ~ "LTL Conditions",
-                                        .rownames == "X4" & model == "Project" ~ "Advection",
-                                        .rownames == "X5" & model == "Project" ~ "Spawning Conditions",
-                                        TRUE ~ NA),
-                     hypoth = factor(hypoth, 
-                          level = c("Upwelling Strength", "Upwelling Timing",
-                                    "Preconditioning", "Advection", "Spawning Conditions", "LTL Conditions",
-                                    "Trophic Community")))
+trendsAll <- trendsAll %>% mutate(labl = paste0("Trend ", sub("X","",.rownames)))
+                     #              hypoth = case_when(.rownames == "X1" & model == "Local" ~ "Upwelling Strength",
+                     #                    .rownames == "X2" & model == "Local" ~ "Upwelling Timing",
+                     #                    .rownames == "X3" & model == "Local" ~ "Preconditioning",
+                     #                    .rownames == "X4" & model == "Local" ~ "Advection",
+                     #                    .rownames == "X5" & model == "Local" ~ "Spawning Conditions", # new term?
+                     #                    .rownames == "X1" & model == "Project" ~ "Upwelling Strength",
+                     #                    .rownames == "X2" & model == "Project" ~ "Upwelling Timing",
+                     #                    .rownames == "X3" & model == "Project" ~ "LTL Conditions",
+                     #                    .rownames == "X4" & model == "Project" ~ "Advection",
+                     #                    .rownames == "X5" & model == "Project" ~ "Spawning Conditions",
+                     #                    TRUE ~ NA),
+                     # hypoth = factor(hypoth, 
+                     #      level = c("Upwelling Strength", "Upwelling Timing",
+                     #                "Preconditioning", "Advection", "Spawning Conditions", "LTL Conditions",
+                     #                "Trophic Community")))
 
 # invertTrends <- trendsAll %>% 
 #                   mutate(invEst = case_when(model == "Project" & .rownames %in% c("X3") ~ -.estimate,
@@ -574,7 +717,7 @@ trendsAll %>%
   ggplot(aes(x = t, y = .estimate, color = model, fill = model)) +
   geom_line(linewidth = 1) +
   geom_ribbon(aes(ymin = .conf.low, ymax = .conf.up), alpha = 0.3) +
-  facet_wrap(~hypoth) +
+  facet_wrap(~labl) +
   labs(x= "Year", y = "State") +
   geom_hline(yintercept = 0) +
   theme_classic()
@@ -588,7 +731,8 @@ randLoading <- tibble(est = 0, conf.up = 0, conf.low = 0, trend = 0, index = "",
 for(ii in 1:100){
   # subset from 1990 to 2019
   allDat <- datDFA %>% filter(year %in% 1990:2019) %>%
-              select(year, all_of(localModel))
+              select(year, #all_of(localModel), 
+                     all_of(projectModel))
   
   # add random vector to test strength of loadings relative to random var
   allDat <- allDat %>% mutate(randTest = rnorm(n = nrow(allDat)))
@@ -597,6 +741,30 @@ for(ii in 1:100){
   
   # transpose for MARSS formatting
   allDat <- allDat %>% select(-year) %>% t()
+  
+  # Rcustom <- matrix(list(0),length(datNames),length(datNames))
+  # diag(Rcustom) <- c("HCI",
+  #                    # "COP", "COP", "COP",
+  #                    "BEUTI", "BEUTI",
+  #                    "CUTI",
+  #                    "LUSI", "LUSI",
+  #                    "STI", "STI",
+  #                    # "RREAS",
+  #                    # "SSWI", "SSWI",
+  #                    # "CalCOFI", "CalCOFI", "CalCOFI",
+  #                    # "RREAS",
+  #                    # "WAA", "WAA",
+  #                    # "PRPOOS", "PRPOOS",
+  #                    "NEMURO", "NEMURO",
+  #                    "sardSDM", "anchSDM", "sardSDM", "anchSDM",
+  #                    "sardlarvSDM", "anchlarvSDM",
+  #                    "anchRec",
+  #                    "sardRec",
+  #                    "SST",
+  #                    # "Alb", "Hake",
+  #                    
+  #                    "Transp", "Transp", "Transp", "Transp",
+  #                    "Rand")
   
   randDFA <- MARSS(y = allDat, 
                    form = "dfa",
@@ -607,14 +775,15 @@ for(ii in 1:100){
                    inits = list(x0 = matrix(1, 1, 1)),
                    z.score = TRUE,
                    model = list( R = "diagonal and equal", # observation errors are the same
-                                 m = 4) # number of latent processes
+                                 # R = Rcustom,
+                                 m = 3) # number of latent processes
   )
   
-  loadingsHist <- ProcessLoadings(randDFA)
+  loadingsRand <- ProcessLoadings(randDFA)
   
-  loadingsDF <- loadingsHist$loadingsDF
+  loadingsRandDF <- loadingsRand$loadingsDF
   
-  randLoading <- loadingsDF %>% filter(index == "randTest") %>% 
+  randLoading <- loadingsRandDF %>% filter(index == "randTest") %>% 
                     bind_rows(randLoading)
 }
 
@@ -622,7 +791,8 @@ summary(abs(randLoading$est))
 
 randLoading %>% filter(index != "", isSig == 1) %>% group_by(trend, index) %>% 
     summarize(meanRandLoad = mean(abs(est)),
-              medianRandLoad = median(abs(est)))
+              medianRandLoad = median(abs(est)),
+              nSigRand = n())
 # most absolute significant loadings < ~0.3 no better than random (for trend 1)
 # < ~0.12 no better than random for trend 4
 # trend index    meanRandLoad medianRandLoad
@@ -631,3 +801,12 @@ randLoading %>% filter(index != "", isSig == 1) %>% group_by(trend, index) %>%
 # 2     2 randTest        0.241          0.242
 # 3     3 randTest        0.165          0.146
 # 4     4 randTest        0.121          0.119
+
+# significant loadings from a 5-trend Local indicators model with equal variance
+# trend index    meanRandLoad medianRandLoad
+# <dbl> <chr>           <dbl>          <dbl>
+# 1     1 randTest        0.350          0.384
+# 2     2 randTest        0.310          0.274
+# 3     3 randTest        0.196          0.184
+# 4     4 randTest        0.245          0.168
+# 5     5 randTest        0.165          0.170

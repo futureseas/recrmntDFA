@@ -32,9 +32,9 @@ projectModel <- c("HCI_R4", "BEUTI_33N", "BEUTI_39N", "CUTI_33N", "OC_LUSI_33N",
 
 # Data for full historical dataset ---------------------------------------
 
-allDat <- datDFA%>% select(year, all_of(localModel))
-# allDat <- datDFA%>% select(year, all_of(localModel),
-#                            ENSO, NPGO, PDOspring, PDOsummer)
+# allDat <- datDFA%>% select(year, all_of(localModel), all_of(projectModel))
+allDat <- datDFA%>% select(year, all_of(localModel), all_of(projectModel),
+                           ENSO, NPGO, PDOspring, PDOsummer)
 
 datNames <- names(allDat)[-1]
 
@@ -57,8 +57,10 @@ diag(Rcustom) <- c("HCI",
                    "anchRec",
                    "sardRec",
                    "SST",
-                   "Alb", "Hake")#,
-                   # "Basin", "Basin", "Basin", "Basin")
+                   "Alb", "Hake",
+                   "NEMURO", "NEMURO",
+                   "Transp", "Transp", "Transp", "Transp", #)
+                   "Basin", "Basin", "Basin", "Basin")
 
 # Data for historical projection dataset ---------------------------------------
 
@@ -102,20 +104,20 @@ for(y in c(#1980, 1985,
   itDat <- initDat %>% select(-year) %>% t()
   
   # loop over number of trends
-  for(m in 6:7){
+  for(m in 1:7){
     cat("\n Trends: ", m)
-    # cat("\n Diagonal and equal R matrix")
-    # itEqRMSE <- LFOXV(dfaDat = itDat,
-    #                    Rstructure = "diagonal and equal",
-    #                    mTrends = m,
-    #                    peels = peels)
-    # 
-    # itEqRMSE <- itEqRMSE %>% mutate(initYr = y,
-    #                                 mTrends = m,
-    #                                 Rstructure = "diag & equal")
-    # 
-    # itEqRMSE %>% filter(resType == "resid.Inf", variable == "totRMSE")
-    # 
+    cat("\n Diagonal and equal R matrix")
+    itEqRMSE <- LFOXV(dfaDat = itDat,
+                       Rstructure = "diagonal and equal",
+                       mTrends = m,
+                       peels = peels)
+
+    itEqRMSE <- itEqRMSE %>% mutate(initYr = y,
+                                    mTrends = m,
+                                    Rstructure = "diag & equal")
+
+    itEqRMSE %>% filter(resType == "resid.Inf", variable == "totRMSE") %>% print()
+
     cat("\n Diagonal and unequal R matrix")
 
     itUneqRMSE <- LFOXV(dfaDat = itDat,
@@ -127,7 +129,7 @@ for(y in c(#1980, 1985,
                                     mTrends = m,
                                     Rstructure = "diag & unequal")
 
-    itUneqRMSE %>% filter(resType == "resid.Inf", variable == "totRMSE")
+    itUneqRMSE %>% filter(resType == "resid.Inf", variable == "totRMSE") %>% print()
 
     cat("\n Custom R matrix")
 
@@ -139,19 +141,19 @@ for(y in c(#1980, 1985,
     itCustRMSE <- itCustRMSE %>% mutate(initYr = y,
                                     mTrends = m,
                                     Rstructure = "custom R by SDM")
-    itCustRMSE %>% filter(resType == "resid.Inf", variable == "totRMSE")
+    itCustRMSE %>% filter(resType == "resid.Inf", variable == "totRMSE") %>% print()
 
-    # xvModSel <- xvModSel %>% bind_rows(itUneqRMSE, itCustRMSE, 
-    #                                    itEqRMSE)
-    xvModSel <- xvModSel %>% bind_rows(itUneqRMSE, itCustRMSE)
+    xvModSel <- xvModSel %>% bind_rows(itUneqRMSE, itCustRMSE,
+                                       itEqRMSE)
+    # xvModSel <- xvModSel %>% bind_rows(itUneqRMSE, itCustRMSE)
   } # end trends loop
 } # end year loop 
 
 xvModSel <- xvModSel %>% mutate(nIndices = length(datNames),
                                 peels = peels)
   
-write_csv(xvModSel, file = "fullHistoricalModelSelection_UneqCust67.csv")
-# write_csv(xvModSel, file = "oceanBasinHistoricalModelSelection.csv")
+# write_csv(xvModSel, file = "fullHistoricalModelSelection_LocalandProj.csv")
+write_csv(xvModSel, file = "oceanBasinHistoricalModelSelection_LocalandProj.csv")
 # write_csv(xvModSel, file = "histProjectionModelSelection.csv")
 
 

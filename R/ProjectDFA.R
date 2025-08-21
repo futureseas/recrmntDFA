@@ -7,22 +7,22 @@ library(MARSS)
 # read prepped dataset
 projDat <- read_csv("C:/Users/r.wildermuth/Documents/FutureSeas/RecruitmentIndex/DFA_data/formattedDFAprojDat.csv")
 
+projectModel <- c("HCI_R4", "BEUTI_33", "BEUTI_39", "CUTI_33", "LUSI_33",
+                  "LUSI_39", "STI_33", "STI_39", "ZM_NorCal",
+                  "ZM_SoCal", "sardSpawnHab", "anchSpawnHab", "daysAbove5pct",
+                  "daysAbove40pct", "sardNurseHab", "anchNurseHab", "anchRec", 
+                  "sardRec", "summerSST", "avgNearTransspring", "avgNearTranssummer", 
+                  "avgOffTransspring", "avgOffTranssummer")
+
 datNames <- names(projDat)[-(1:2)]
 
 # load fitted MARSS output
-load(file = "marssFit_1990to2019_ProjDFA_5trend_Rcustom.RData")
+load(file = "marssFit_1990to2019_ProjDFA_3trend_DiagEql.RData")
 
 # transpose for MARSS formatting
 projDatIPSL <- projDat %>% filter(ESM == "IPSL") %>%
                   select(-year, -ESM) %>%
-                  select(c("HCI_R3", "HCI_R4", "BEUTI_33", "BEUTI_39", "CUTI_33", 
-                           "CUTI_39", "LUSI_33", "LUSI_36", "LUSI_39", "STI_33", 
-                           "STI_36", "STI_39", "sardLarv", "anchLarv", "anchYoY", 
-                           "ZM_NorCal", "ZM_SoCal", "sardSpawnHab", "anchSpawnHab", 
-                           "daysAbove5pct", "daysAbove40pct", "sardNurseHab", 
-                           "anchNurseHab", "anchRec", "sardRec", "springSST", 
-                           "summerSST", "avgNearTransspring", "avgNearTranssummer",
-                           "avgOffTransspring", "avgOffTranssummer")) %>%
+                  select(all_of(projectModel)) %>%
                   t()
 
 # Testing what predict() does for estimating latent states
@@ -51,14 +51,7 @@ plot(forecastIPSL)
 
 projDatGFDL <- projDat %>% filter(ESM == "GFDL") %>%
                   select(-year, -ESM) %>%
-                  select(c("HCI_R3", "HCI_R4", "BEUTI_33", "BEUTI_39", "CUTI_33", 
-                           "CUTI_39", "LUSI_33", "LUSI_36", "LUSI_39", "STI_33", 
-                           "STI_36", "STI_39", "sardLarv", "anchLarv", "anchYoY", 
-                           "ZM_NorCal", "ZM_SoCal", "sardSpawnHab", "anchSpawnHab", 
-                           "daysAbove5pct", "daysAbove40pct", "sardNurseHab", 
-                           "anchNurseHab", "anchRec", "sardRec", "springSST", 
-                           "summerSST", "avgNearTransspring", "avgNearTranssummer",
-                           "avgOffTransspring", "avgOffTranssummer")) %>% t()
+                  select(all_of(projectModel)) %>% t()
 
 forecastGFDL <- forecast(object = projectDFA,
                         newdata = list(y = projDatGFDL), # data are zscored in FormatProjectionData.R
@@ -75,14 +68,7 @@ plot(forecastGFDL)
 
 projDatHAD <- projDat %>% filter(ESM == "HAD") %>%
                 select(-year, -ESM) %>% 
-                select(c("HCI_R3", "HCI_R4", "BEUTI_33", "BEUTI_39", "CUTI_33", 
-                         "CUTI_39", "LUSI_33", "LUSI_36", "LUSI_39", "STI_33", 
-                         "STI_36", "STI_39", "sardLarv", "anchLarv", "anchYoY", 
-                         "ZM_NorCal", "ZM_SoCal", "sardSpawnHab", "anchSpawnHab", 
-                         "daysAbove5pct", "daysAbove40pct", "sardNurseHab", 
-                         "anchNurseHab", "anchRec", "sardRec", "springSST", 
-                         "summerSST", "avgNearTransspring", "avgNearTranssummer",
-                         "avgOffTransspring", "avgOffTranssummer")) %>% t()
+                select(all_of(projectModel)) %>% t()
 
 forecastHAD <- forecast(object = projectDFA,
                        newdata = list(y = projDatHAD), # data are zscored in FormatProjectionData.R
@@ -135,21 +121,21 @@ projTSGFDL %>%
   #                                                 "X2", "X3", "X4", "X5",
   #                                                 "anchRec", "sardRec"))) %>%
 
-  # filter(.rownames %in% paste0("X", 1:5)) %>%
+  filter(.rownames %in% paste0("X", 1:3)) %>%
 
-  filter(.rownames %in% c("HCI_R3", "HCI_R4", "BEUTI_33N", "BEUTI_39N", "CUTI_33N",
-                         "CUTI_39N", "OC_LUSI_33N", "OC_LUSI_36N", "OC_LUSI_39N",
-                         "OC_STI_33N", "OC_STI_36N", "OC_STI_39N",
-                         "ZM_NorCal", "ZM_SoCal", "sardSpawnHab", "anchSpawnHab",
-                         "daysAbove5pct", "daysAbove40pct", "sardNurseHab",
-                         "anchNurseHab",  "springSST",
-                         "summerSST", "avgNearTransspring", "avgNearTranssummer",
-                         "avgOffTransspring", "avgOffTranssummer")) %>%
+  # filter(.rownames %in% c("HCI_R3", "HCI_R4", "BEUTI_33N", "BEUTI_39N", "CUTI_33N",
+  #                        "CUTI_39N", "OC_LUSI_33N", "OC_LUSI_36N", "OC_LUSI_39N",
+  #                        "OC_STI_33N", "OC_STI_36N", "OC_STI_39N",
+  #                        "ZM_NorCal", "ZM_SoCal", "sardSpawnHab", "anchSpawnHab",
+  #                        "daysAbove5pct", "daysAbove40pct", "sardNurseHab",
+  #                        "anchNurseHab",  "springSST",
+  #                        "summerSST", "avgNearTransspring", "avgNearTranssummer",
+  #                        "avgOffTransspring", "avgOffTranssummer")) %>%
 
   ggplot(aes(x = t, y = estimate)) +
   geom_line() +
   geom_ribbon(aes(ymin = Lo.95, ymax = Hi.95), alpha = 0.3) +
-  facet_wrap(~.rownames, scales = "free", ncol = 4) +
+  facet_wrap(~.rownames, scales = "free", ncol = 3) +
   geom_point(aes(y = y), color = "steelblue", size = 0.2) +
   geom_vline(xintercept = 30.5) + geom_hline(yintercept = 0) +
   theme_classic() +
@@ -163,6 +149,7 @@ projTSGFDL %>%
   facet_wrap(~.rownames, scales = "free") +
   geom_point(aes(y = y), color = "steelblue", shape = 1, size = 1) +
   geom_vline(xintercept = 30.5) +
+  geom_hline(yintercept = 0) +
   theme_classic() +
   labs(title = "GFDL")
 
@@ -173,9 +160,9 @@ names(projTSIPSL) <- make.names(names(projTSIPSL))
 projTSHAD <- bind_rows(forecastHAD$pred, fcastXsHAD$pred) %>% mutate(ESM = "HAD")
 names(projTSHAD) <- make.names(names(projTSHAD))
 
-# projTSIPSL %>% 
-projTSHAD %>% 
-  # filter(.rownames %in% paste0("X", 1:5)) %>%
+# projTSIPSL %>%
+projTSHAD %>%
+  # filter(.rownames %in% paste0("X", 1:3)) %>%
   
   filter(.rownames %in% c("HCI_R3", "HCI_R4", "BEUTI_33N", "BEUTI_39N", "CUTI_33N",
                           "CUTI_39N", "OC_LUSI_33N", "OC_LUSI_36N", "OC_LUSI_39N",
@@ -185,18 +172,19 @@ projTSHAD %>%
                           "anchNurseHab",  "springSST",
                           "summerSST", "avgNearTransspring", "avgNearTranssummer",
                           "avgOffTransspring", "avgOffTranssummer")) %>%
-  #   
+
   ggplot(aes(x = t, y = estimate)) +
   geom_line() +
   geom_ribbon(aes(ymin = Lo.95, ymax = Hi.95), alpha = 0.3) +
-  facet_wrap(~.rownames, scales = "free", ncol = 4) +
+  facet_wrap(~.rownames, scales = "free", ncol = 3) +
   geom_point(aes(y = y), color = "steelblue", size = 0.2) +
   geom_vline(xintercept = 30.5) + geom_hline(yintercept = 0) +
   theme_classic() +
+  # labs(title = "IPSL")
   labs(title = "HAD")
 
-# projTSIPSL %>% 
-projTSHAD %>% 
+# projTSIPSL %>%
+projTSHAD %>%
   filter(.rownames %in% c("sardLarv", "anchLarv", "anchYoY", "anchRec", "sardRec" )) %>%
   ggplot(aes(x = t, y = estimate)) +
   geom_line() +
@@ -206,7 +194,7 @@ projTSHAD %>%
   geom_vline(xintercept = 30.5) + geom_hline(yintercept = 0) +
   theme_classic() +
   labs(title = "HAD")
-
+  # labs(title = "IPSL")
 
 allProj <- bind_rows(projTSHAD, projTSGFDL, projTSIPSL) %>% 
             mutate(Year = t + 1989,
@@ -228,39 +216,48 @@ if (ncol(Z.est) > 1){
 Z.rot <- Z.est %*% H.inv
 plotZs <- as.data.frame(Z.rot)
 plotZs$.rownames <- row.names(Z.rot)
-plotZs <- plotZs %>%  filter(.rownames %in% c("avgNearTranssummer", "sardNurseHab", "HCI_R4", # (nearly) significant
-                                              "OC_STI_33N", "sardSpawnHab", "daysAbove5pct", # not sig but strong
-                                              "X4", "sardRec")) %>% 
+plotZs <- plotZs %>%  filter(.rownames %in% c("HCI_R4", "sardNurseHab", 
+                                              "ZM_NorCal", "BEUTI_39N", 
+                                              "OC_STI_39N", "OC_LUSI_39N",
+                                              "avgNearTransspring",
+                                              "X2", "sardRec")) %>% 
             mutate(.rownames = factor(.rownames, 
-                                      levels = c("avgNearTranssummer", "sardNurseHab", "HCI_R4", # (nearly) significant
-                                                 "OC_STI_33N", "sardSpawnHab", "daysAbove5pct", # not sig but strong
-                                                 "X4", "sardRec"),
-                                      labels = c("Nearshore Poleward Transport, Summer", 
+                                      levels = c("HCI_R4", "sardNurseHab", 
+                                                 "ZM_NorCal", "BEUTI_39N", 
+                                                 "OC_STI_39N", "OC_LUSI_39N",
+                                                 "avgNearTransspring",
+                                                 "X2", "sardRec"),
+                                      labels = c("Habitat Compression, Southern CA Bight",
                                                  "Sardine Nursury Habitat", 
-                                                 "Habitat Compression, Southern CA Bight",
-                                                 "Spring Transition Index 33N", 
-                                                 "Sardine Spawning Habitat",
-                                                 "Sardine Spawning Duration",
-                                                 "Trend 4: Advection",
+                                                 "NEMURO Zooplankton, Northern CCE",
+                                                 "Upwelling Nutrient Flux 39N",
+                                                 "Spring Transition Index 39N",
+                                                 "Length of Upwelling Season 39N",
+                                                 "Nearshore Poleward Transport, Spring",
+                                                 "Trend 2",
                                                  "Sardine Recruitment")))
 
 # Example plot of forcing variables, primary latent trend, and sardine recruitment projection
 allProj %>%
   # full_join(y = Z.rot, by = ".rownames") %>%
   mutate(t = t+1989) %>%
-  filter(.rownames %in% c("avgNearTranssummer", "sardNurseHab", "HCI_R4", # (nearly) significant
-                          "OC_STI_33N", "sardSpawnHab", "daysAbove5pct", # not sig but strong
-                          "X4", "sardRec")) %>%
-  mutate(.rownames = factor(.rownames, levels = c("avgNearTranssummer", "sardNurseHab", "HCI_R4", # (nearly) significant
-                                                  "OC_STI_33N", "sardSpawnHab", "daysAbove5pct", # not sig but strong
-                                                  "X4", "sardRec"),
-                            labels = c("Nearshore Poleward Transport, Summer", 
+  filter(.rownames %in% c("HCI_R4", "sardNurseHab", 
+                          "ZM_NorCal", "BEUTI_39N", 
+                          "OC_STI_39N", "OC_LUSI_39N", "avgNearTransspring",
+                          "X2", "sardRec")) %>%
+  mutate(.rownames = factor(.rownames, levels = c("HCI_R4", "sardNurseHab", 
+                                                  "ZM_NorCal", "BEUTI_39N", 
+                                                  "OC_STI_39N", "OC_LUSI_39N",
+                                                  "avgNearTransspring",
+                                                  "X2", "sardRec"),
+                            labels = c("Habitat Compression, Southern CA Bight",
                                        "Sardine Nursury Habitat", 
-                                       "Habitat Compression, Southern CA Bight",
-                                       "Spring Transition Index 33N", 
-                                       "Sardine Spawning Habitat",
-                                       "Sardine Spawning Duration",
-                                       "Trend 4: Advection",
+                                       "NEMURO Zooplankton, Northern CCE",
+                                       "Upwelling Nutrient Flux 39N",
+                                       "Spring Transition Index 39N",
+                                       "Length of Upwelling Season 39N",
+                                       "Nearshore Poleward Transport, Spring",
+                                       "Trend 2",
                                        "Sardine Recruitment"))) %>%
   ggplot(aes(x = t, y = estimate, color = ESM, fill = ESM)) +
   geom_line() +
@@ -271,9 +268,21 @@ allProj %>%
   geom_vline(xintercept = 2019.5) + geom_hline(yintercept = 0) +
   geom_text(data = plotZs,
             mapping = aes(x = -Inf, y = Inf, hjust = -0.5, vjust = 1.5,
-                          label = round(V4, digits = 3)), 
+                          label = round(V2, digits = 3)), 
             inherit.aes = FALSE,
             color = "black") +
+  theme_classic()
+
+allProj %>%
+  mutate(t = t+1989) %>%
+  filter(.rownames %in% c(paste0("X", 1:3), "sardRec", "anchRec")) %>%
+  ggplot(aes(x = t, y = estimate, color = ESM, fill = ESM)) +
+  geom_line() +
+  geom_ribbon(aes(ymin = Lo.95, ymax = Hi.95), alpha = 0.3) +
+  geom_smooth(method = "loess", se = FALSE) +
+  facet_wrap(~.rownames, scales = "free", nrow = 3) +
+  geom_point(aes(y = y), color = "black", shape = 1, size = 1) +
+  geom_vline(xintercept = 2019.5) + geom_hline(yintercept = 0) +
   theme_classic()
 
 
@@ -343,8 +352,9 @@ projProp %>% filter(.rownames %in% c("anchRec", "sardRec")) %>%
   ggplot(aes(x = periods, y = t, fill = finalCat)) +
   geom_col(position = "fill") +
   scale_y_continuous(labels = scales::percent) +
+  scale_fill_brewer(type = "div", direction = -1) +
   facet_grid(rows = vars(.rownames), cols = vars(ESM)) +
-  theme_bw() +
+  theme_classic() +
   labs(y = "Recruitment Deviation Proportion", fill = "Category")
 
 # summarize frequency of being outside historical min/max values (of 81 projection years)
