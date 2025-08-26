@@ -42,11 +42,50 @@ locDat <- locDat %>% filter(year %in% 1990:2019)
 # transpose for MARSS formatting
 itDat <- locDat %>% select(-year) %>% t()
 
-locEqRMSE <- LFOXV(dfaDat = itDat,
+locEqRMSE1 <- LFOXV(dfaDat = itDat,
+                  Rstructure = "diagonal and equal",
+                  mTrends = 2,
+                  peels = peels,
+                  horizon = 1) 
+locEqRMSE <- locEqRMSE1 %>% filter(variable == "totRMSE", 
+                                    resType == "resid.Inf",
+                                    predHoriz == 1)
+locEqRMSE2 <- LFOXV(dfaDat = itDat,
+                  Rstructure = "diagonal and equal",
+                  mTrends = 2,
+                  peels = peels,
+                  horizon = 2)
+locEqRMSE <- locEqRMSE2 %>% filter(variable == "totRMSE", 
+                                   resType == "resid.Inf",
+                                   predHoriz == 2) %>%
+                bind_rows(locEqRMSE)
+locEqRMSE3 <- LFOXV(dfaDat = itDat,
+                  Rstructure = "diagonal and equal",
+                  mTrends = 2,
+                  peels = peels,
+                  horizon = 3)
+locEqRMSE <- locEqRMSE3 %>% filter(variable == "totRMSE", 
+                                   resType == "resid.Inf",
+                                   predHoriz == 3) %>%
+                bind_rows(locEqRMSE)
+locEqRMSE4 <- LFOXV(dfaDat = itDat,
+                  Rstructure = "diagonal and equal",
+                  mTrends = 2,
+                  peels = peels,
+                  horizon = 4)
+locEqRMSE <- locEqRMSE4 %>% filter(variable == "totRMSE", 
+                                   resType == "resid.Inf",
+                                   predHoriz == 4) %>%
+                bind_rows(locEqRMSE)
+locEqRMSE5 <- LFOXV(dfaDat = itDat,
                   Rstructure = "diagonal and equal",
                   mTrends = 2,
                   peels = peels,
                   horizon = 5)
+locEqRMSE <- locEqRMSE5 %>% filter(variable == "totRMSE", 
+                                   resType == "resid.Inf",
+                                   predHoriz == 5) %>%
+                bind_rows(locEqRMSE)
 
 locEqRMSE$model <- "Local"
 
@@ -62,11 +101,50 @@ projDat <- projDat %>% filter(year %in% 1990:2019)
 # transpose for MARSS formatting
 itDat <- projDat %>% select(-year) %>% t()
 
-projEqRMSE <- LFOXV(dfaDat = itDat,
+projEqRMSE1 <- LFOXV(dfaDat = itDat,
                   Rstructure = "diagonal and equal",
                   mTrends = 3,
                   peels = peels,
-                  horizon = 5)
+                  horizon = 1)
+projEqRMSE <- projEqRMSE1 %>% filter(variable == "totRMSE", 
+                                   resType == "resid.Inf",
+                                   predHoriz == 1)
+projEqRMSE2 <- LFOXV(dfaDat = itDat,
+                    Rstructure = "diagonal and equal",
+                    mTrends = 3,
+                    peels = peels,
+                    horizon = 2)
+projEqRMSE <- projEqRMSE2 %>% filter(variable == "totRMSE", 
+                                   resType == "resid.Inf",
+                                   predHoriz == 2) %>%
+                bind_rows(projEqRMSE)
+projEqRMSE3 <- LFOXV(dfaDat = itDat,
+                    Rstructure = "diagonal and equal",
+                    mTrends = 3,
+                    peels = peels,
+                    horizon = 3)
+projEqRMSE <- projEqRMSE3 %>% filter(variable == "totRMSE", 
+                                   resType == "resid.Inf",
+                                   predHoriz == 3) %>%
+                bind_rows(projEqRMSE)
+projEqRMSE4 <- LFOXV(dfaDat = itDat,
+                    Rstructure = "diagonal and equal",
+                    mTrends = 3,
+                    peels = peels,
+                    horizon = 4)
+projEqRMSE <- projEqRMSE4 %>% filter(variable == "totRMSE", 
+                                   resType == "resid.Inf",
+                                   predHoriz == 4) %>%
+                bind_rows(projEqRMSE)
+projEqRMSE5 <- LFOXV(dfaDat = itDat,
+                    Rstructure = "diagonal and equal",
+                    mTrends = 3,
+                    peels = peels,
+                    horizon = 5)
+projEqRMSE <- projEqRMSE5 %>% filter(variable == "totRMSE", 
+                                   resType == "resid.Inf",
+                                   predHoriz == 5) %>%
+                bind_rows(projEqRMSE)
 projEqRMSE$model <- "Projection"
 # Calculate Persistence Prediction RMSE -----------------------------------
 
@@ -120,9 +198,9 @@ testFcast <- bind_rows(locEqRMSE, projEqRMSE) #, perstResids)
 # plot out best performing model structures over prediction horizons
 testFcast %>% filter(resType %in% "resid.Inf", variable == "totRMSE") %>%
   ggplot(aes(x = predHoriz, y = RMSE)) +
-  geom_line(aes(color = as.character(model))) + #paste(mTrends, Rstructure, sep = "-"))) +
+  geom_line(aes(color = as.character(model)), linewidth = 1) + #paste(mTrends, Rstructure, sep = "-"))) +
   geom_point(data = perstResids %>% filter(predHoriz != 0), aes(y = totRMSE)) +
   geom_hline(yintercept = perstResids %>% filter(predHoriz == 0) %>% pull(totRMSE)) +
-  scale_color_viridis_d() +
+  # scale_color_viridis_d() +
   labs(color = "Model", x = "Prediction Horizon") +
   theme_classic()
