@@ -216,26 +216,44 @@ if (ncol(Z.est) > 1){
 Z.rot <- Z.est %*% H.inv
 plotZs <- as.data.frame(Z.rot)
 plotZs$.rownames <- row.names(Z.rot)
-plotZs <- plotZs %>%  filter(.rownames %in% c("HCI_R4", "sardNurseHab", 
-                                              "ZM_NorCal", "BEUTI_39N", 
-                                              "OC_STI_39N", "OC_LUSI_39N",
-                                              "avgNearTransspring",
-                                              "X2", "sardRec")) %>% 
-            mutate(.rownames = factor(.rownames, 
-                                      levels = c("HCI_R4", "sardNurseHab", 
-                                                 "ZM_NorCal", "BEUTI_39N", 
-                                                 "OC_STI_39N", "OC_LUSI_39N",
-                                                 "avgNearTransspring",
-                                                 "X2", "sardRec"),
-                                      labels = c("Habitat Compression, Southern CA Bight",
-                                                 "Sardine Nursury Habitat", 
-                                                 "NEMURO Zooplankton, Northern CCE",
-                                                 "Upwelling Nutrient Flux 39N",
-                                                 "Spring Transition Index 39N",
-                                                 "Length of Upwelling Season 39N",
-                                                 "Nearshore Poleward Transport, Spring",
-                                                 "Trend 2",
-                                                 "Sardine Recruitment")))
+# plotZs <- plotZs %>%  filter(.rownames %in% c("HCI_R4", "sardNurseHab", 
+#                                               "ZM_NorCal", "BEUTI_39N", 
+#                                               "OC_STI_39N", "OC_LUSI_39N",
+#                                               "avgNearTransspring",
+#                                               "X2", "sardRec")) %>% 
+#             mutate(.rownames = factor(.rownames, 
+#                                       levels = c("HCI_R4", "sardNurseHab", 
+#                                                  "ZM_NorCal", "BEUTI_39N", 
+#                                                  "OC_STI_39N", "OC_LUSI_39N",
+#                                                  "avgNearTransspring",
+#                                                  "X2", "sardRec"),
+#                                       labels = c("Habitat Compression, Southern CA Bight",
+#                                                  "Sardine Nursury Habitat", 
+#                                                  "NEMURO Zooplankton, Northern CCE",
+#                                                  "Upwelling Nutrient Flux 39N",
+#                                                  "Spring Transition Index 39N",
+#                                                  "Length of Upwelling Season 39N",
+#                                                  "Nearshore Poleward Transport, Spring",
+#                                                  "Trend 2",
+#                                                  "Sardine Recruitment")))
+plotZs <- plotZs %>%  filter(.rownames %in% c("HCI_R4", "anchNurseHab", 
+                                              "ZM_NorCal", "summerSST", "avgOffTranssummer", "BEUTI_39N", 
+                                              "OC_STI_39N", 
+                                              "X1", "anchRec")) %>%
+  mutate(.rownames = factor(.rownames, levels = c("HCI_R4", "anchNurseHab", 
+                                                  "ZM_NorCal", "summerSST", 
+                                                  "avgOffTranssummer", "BEUTI_39N", 
+                                                  "OC_STI_39N", 
+                                                  "X1", "anchRec"),
+                            labels = c("Habitat Compression, Southern CA Bight",
+                                       "Anchovy Nursury Habitat", 
+                                       "NEMURO Zooplankton, Northern CCE",
+                                       "Summer SST",
+                                       "Offshore Poleward Transport, Summer",
+                                       "Upwelling Nutrient Flux 39N",
+                                       "Spring Transition Index 39N",
+                                       "Trend 1",
+                                       "Anchovy Recruitment")))
 
 # Example plot of forcing variables, primary latent trend, and sardine recruitment projection
 allProj %>%
@@ -269,6 +287,42 @@ allProj %>%
   geom_text(data = plotZs,
             mapping = aes(x = -Inf, y = Inf, hjust = -0.5, vjust = 1.5,
                           label = round(V2, digits = 3)), 
+            inherit.aes = FALSE,
+            color = "black") +
+  theme_classic()
+
+# Example plot of forcing variables, primary latent trend, and anchovy recruitment projection
+allProj %>%
+  # full_join(y = Z.rot, by = ".rownames") %>%
+  mutate(t = t+1989) %>%
+  filter(.rownames %in% c("HCI_R4", "anchNurseHab", 
+                          "ZM_NorCal", "summerSST", "avgOffTranssummer", "BEUTI_39N", 
+                          "OC_STI_39N", 
+                          "X1", "anchRec")) %>%
+  mutate(.rownames = factor(.rownames, levels = c("HCI_R4", "anchNurseHab", 
+                                                  "ZM_NorCal", "summerSST", 
+                                                  "avgOffTranssummer", "BEUTI_39N", 
+                                                  "OC_STI_39N", 
+                                                  "X1", "anchRec"),
+                            labels = c("Habitat Compression, Southern CA Bight",
+                                       "Anchovy Nursury Habitat", 
+                                       "NEMURO Zooplankton, Northern CCE",
+                                       "Summer SST",
+                                       "Offshore Poleward Transport, Summer",
+                                       "Upwelling Nutrient Flux 39N",
+                                       "Spring Transition Index 39N",
+                                       "Trend 1",
+                                       "Anchovy Recruitment"))) %>%
+  ggplot(aes(x = t, y = estimate, color = ESM, fill = ESM)) +
+  geom_line() +
+  geom_ribbon(aes(ymin = Lo.95, ymax = Hi.95), alpha = 0.3) +
+  geom_smooth(method = "loess", se = FALSE) +
+  facet_wrap(~.rownames, scales = "free", nrow = 3) +
+  geom_point(aes(y = y), color = "black", shape = 1, size = 1) +
+  geom_vline(xintercept = 2019.5) + geom_hline(yintercept = 0) +
+  geom_text(data = plotZs,
+            mapping = aes(x = -Inf, y = Inf, hjust = -0.5, vjust = 1.5,
+                          label = round(V1, digits = 3)), 
             inherit.aes = FALSE,
             color = "black") +
   theme_classic()
